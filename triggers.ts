@@ -10,13 +10,12 @@
 //     echo-banner to the command so the agent sees them in tool output on
 //     the same turn. Fails open — never blocks the tool.
 
-import { spawn } from "node:child_process";
-import path from "node:path";
 import {
   CODING_LESSONS_SCRIPT, CODING_LESSONS_TIMEOUT_MS,
   KEYWORD_TRIGGERS,
 } from "./paths.ts";
-import { latestUserMessage, windowsPathToWsl } from "./util.ts";
+import { latestUserMessage } from "./util.ts";
+import { runWsl, windowsPathToWsl } from "./wsl.ts";
 
 // ── keyword triggers ───────────────────────────────────────────────────────
 
@@ -72,48 +71,33 @@ export async function injectKeywordTriggers(output) {
 
 // ── coding-lessons banner ──────────────────────────────────────────────────
 
-// Spawn the coding-lessons-by-shape.py fetcher (postgres → JSON). Mirrors
-// the spawn pattern used in memory.ts. Fail-open: returns empty lessons
-// on any error so the tool.execute.before hook never blocks tool execution.
-export function runCodingLessonsByShape(roomDir, roomName, shape) {
-  const args = [
-    "python3",
-    windowsPathToWsl(CODING_LESSONS_SCRIPT),
-    "--room-dir", windowsPathToWsl(roomDir),
-    "--shape", String(shape),
-    "--room", String(roomName || "shared").toLowerCase(),
-  ];
-  return new Promise((resolve) => {
-    const child = spawn("wsl.exe", args, { cwd: roomDir, windowsHide: true });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const settle = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    const timer = setTimeout(() => {
-      child.kill();
-      settle({ ok: false, lessons: [], error: "coding-lessons timed out" });
-    }, CODING_LESSONS_TIMEOUT_MS);
-    child.stdout?.on("data", (chunk) => { stdout += chunk.toString("utf8"); });
-    child.stderr?.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
-    child.on("error", (err) => settle({ ok: false, lessons: [], error: err?.message || String(err) }));
-    child.on("close", (code) => {
-      try {
-        const parsed = JSON.parse(stdout || "{}");
-        settle({
-          ok: code === 0,
-          lessons: parsed.lessons || [],
-          error: parsed.error || (code !== 0 ? stderr.trim() : null),
-        });
-      } catch (err) {
-        settle({ ok: false, lessons: [], error: err?.message || String(err) });
-      }
-    });
+// Spawn the coding-lessons-by-shape.py fetcher (postgres → JSON) through
+// the shared WSL seam. Fail-open: returns empty lessons on any error so
+// the tool.execute.before hook never blocks tool execution.
+export async function runCodingLessonsByShape(roomDir, roomName, shape) {
+  const outcome = await runWsl({
+    argv: [
+      "python3",
+      windowsPathToWsl(CODING_LESSONS_SCRIPT),
+      "--room-dir", windowsPathToWsl(roomDir),
+      "--shape", String(shape),
+      "--room", String(roomName || "shared").toLowerCase(),
+    ],
+    cwd: roomDir,
+    timeoutMs: CODING_LESSONS_TIMEOUT_MS,
   });
+  if (outcome.timedOut) return { ok: false, lessons: [], error: "coding-lessons timed out" };
+  if (outcome.spawnError) return { ok: false, lessons: [], error: outcome.spawnError };
+  try {
+    const parsed = JSON.parse(outcome.stdout || "{}");
+    return {
+      ok: outcome.code === 0,
+      lessons: parsed.lessons || [],
+      error: parsed.error || (outcome.code !== 0 ? outcome.stderr.trim() : null),
+    };
+  } catch (err) {
+    return { ok: false, lessons: [], error: err?.message || String(err) };
+  }
 }
 
 // Format a compact banner from a list of coding_lessons rows. Pairs (rows

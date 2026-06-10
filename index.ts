@@ -10,7 +10,8 @@
 //
 // Module map:
 //   paths.ts       — constants + tuning knobs only
-//   util.ts        — generic helpers (json io, regex, fs scaffolding, wsl)
+//   util.ts        — generic helpers (json io, regex, fs scaffolding)
+//   wsl.ts         — the Windows→WSL seam (path translation + spawn)
 //   spirit.ts      — room coercion, contract loading, active_spirit writes
 //   directives.ts  — state, EMBODY/Operator/DISMISS parsing, history strip
 //   ledger.ts      — conversation jsonl + spirit window + live context

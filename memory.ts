@@ -21,7 +21,6 @@
 
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import {
   HOUSE_MEMORY_DIRNAME,
@@ -44,8 +43,9 @@ import {
   MEMORY_STATE_FILENAME, MEMORY_STOPWORDS, MEMORY_TOKEN_RE,
 } from "./paths.ts";
 import {
-  escapeRegExp, latestUserMessage, readJson, windowsPathToWsl, writeJsonFile,
+  escapeRegExp, latestUserMessage, readJson, writeJsonFile,
 } from "./util.ts";
+import { runWsl, windowsPathToWsl } from "./wsl.ts";
 import { resolveEffectiveRoomDir } from "./spirit.ts";
 import { loadState } from "./directives.ts";
 
@@ -575,54 +575,24 @@ function annotateMemoryExcerptsWithCanonRefs(
 // spawnPostgresSource is the shared spawn machinery; the two wrappers below
 // just build the right argv for each mode.
 
-function spawnPostgresSource(roomDir, args, prompt) {
-  return new Promise((resolve) => {
-    const fullArgs = [
-      "python3",
-      windowsPathToWsl(MEMORY_POSTGRES_SOURCE_SCRIPT),
-      ...args,
-    ];
-    const child = spawn("wsl.exe", fullArgs, {
-      cwd: roomDir,
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const settle = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    const timer = setTimeout(() => {
-      child.kill();
-      settle({ ok: false, error: "postgres source timed out" });
-    }, MEMORY_POSTGRES_TIMEOUT_MS);
-
-    // Pipe prompt via stdin (avoids argv-length issues on long prompts).
-    try {
-      child.stdin?.end(String(prompt || ""));
-    } catch {
-      /* fail-soft */
-    }
-
-    child.stdout?.on("data", (chunk) => { stdout += chunk.toString("utf8"); });
-    child.stderr?.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
-    child.on("error", (err) => settle({ ok: false, error: err?.message || String(err) }));
-    child.on("close", (code) => {
-      if (code !== 0) {
-        settle({ ok: false, error: stderr.trim() || `postgres source exited ${code}` });
-        return;
-      }
-      try {
-        settle({ ok: true, data: JSON.parse(stdout), stderr: stderr.trim() });
-      } catch (err) {
-        settle({ ok: false, error: err?.message || String(err) });
-      }
-    });
+async function spawnPostgresSource(roomDir, args, prompt) {
+  const outcome = await runWsl({
+    argv: ["python3", windowsPathToWsl(MEMORY_POSTGRES_SOURCE_SCRIPT), ...args],
+    cwd: roomDir,
+    // Prompt rides stdin (avoids argv-length issues on long prompts).
+    stdin: String(prompt || ""),
+    timeoutMs: MEMORY_POSTGRES_TIMEOUT_MS,
   });
+  if (outcome.timedOut) return { ok: false, error: "postgres source timed out" };
+  if (outcome.spawnError) return { ok: false, error: outcome.spawnError };
+  if (outcome.code !== 0) {
+    return { ok: false, error: outcome.stderr.trim() || `postgres source exited ${outcome.code}` };
+  }
+  try {
+    return { ok: true, data: JSON.parse(outcome.stdout), stderr: outcome.stderr.trim() };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 function runMemoryPostgresLexical(roomDir, roomName, prompt) {

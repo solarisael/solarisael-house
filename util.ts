@@ -1,5 +1,5 @@
 // Generic helpers: regex/string normalization, JSON IO, fs scaffolding,
-// date stamping, WSL path translation, latest-user-message lookup.
+// date stamping, latest-user-message lookup.
 //
 // Independent of plugin-specific concepts (memory, spirit, ledger). If a
 // helper takes a "spirit" or "memory" argument, it does not belong here.
@@ -76,15 +76,6 @@ export function localDateStamp(date = new Date()) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-// Translate `C:\foo\bar` → `/mnt/c/foo/bar` for WSL spawn argv. Falls
-// through to the original for non-Windows-absolute paths.
-export function windowsPathToWsl(value) {
-  const source = String(value || "").replace(/\\/g, "/");
-  const match = /^([A-Za-z]):\/(.*)$/.exec(source);
-  if (!match) return source;
-  return `/mnt/${match[1].toLowerCase()}/${match[2]}`;
 }
 
 // Most-recent user message in a chat.messages.transform-shaped messages array.
