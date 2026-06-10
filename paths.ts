@@ -147,15 +147,3 @@ export const KEYWORD_TRIGGERS = {
     "The user included the keyword 'ultraverify', requesting a verification pass against intention. Re-read the original request. Check whether the path you took matches what was asked, not just whether your output is green. Surface assumptions that haven't been confirmed.",
 };
 
-// Provider+modelID → agent-name lookup. Used to resolve the agent display
-// name from the active model. Fallback is the stored agentName in state.
-export const MODEL_AGENT_NAME_MAP: Record<string, Record<string, string>> = {
-  openai: {
-    "gpt-5.5": "Kintsu",
-    "gpt-5.4": "Kintsu",
-  },
-  anthropic: {
-    "claude-opus-4-7": "Kodo",
-    "claude-opus-4-6": "Kodo",
-  },
-};

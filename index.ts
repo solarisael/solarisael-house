@@ -5,8 +5,8 @@
 //
 // Everything else (Babel output enforcement, renderer summary contract,
 // TUI theme, system-injection observability hook, drift-detection openers,
-// orphan helpers) was cut. Recoverable from index.ts.preLeanRewrite-
-// 2026-05-12.backup if any of it needs to come back.
+// orphan helpers) was cut. Recoverable from git history (initial commit
+// 84f84cb carries the pre-lean backups) if any of it needs to come back.
 //
 // Module map:
 //   paths.ts       — constants + tuning knobs only

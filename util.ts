@@ -4,7 +4,7 @@
 // Independent of plugin-specific concepts (memory, spirit, ledger). If a
 // helper takes a "spirit" or "memory" argument, it does not belong here.
 
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { RUNTIME_DIR } from "./paths.ts";
 
@@ -69,11 +69,6 @@ export async function writeJson(target, value) {
 export async function writeJsonFile(target, value) {
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
-
-export async function appendTextFile(target, content) {
-  await mkdir(path.dirname(target), { recursive: true });
-  await appendFile(target, content, "utf8");
 }
 
 export function localDateStamp(date = new Date()) {

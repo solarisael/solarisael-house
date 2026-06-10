@@ -12,7 +12,6 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   DEFAULT_AGENT_NAME, DEFAULT_SPIRIT,
-  MODEL_AGENT_NAME_MAP,
   RUNTIME_DIR, SPIRIT_CONTRACT_OUTPUT, SPIRIT_DIR,
   SUPPORTED_SPIRITS,
 } from "./paths.ts";
@@ -50,14 +49,6 @@ export async function normalizeSpirit(value) {
   if (exact) return exact;
   const target = normalizeForMatch(requested);
   return SUPPORTED_SPIRITS.find((mode) => normalizeForMatch(mode) === target) || null;
-}
-
-export function resolveAgentName(model, fallback) {
-  const providerID = String(model?.providerID || "").toLowerCase();
-  const modelID = String(model?.modelID || "").toLowerCase();
-  const byProvider = MODEL_AGENT_NAME_MAP[providerID];
-  if (byProvider && byProvider[modelID]) return byProvider[modelID];
-  return normalizeAgentName(fallback);
 }
 
 // Walk UP from a directory looking for a kodo/kintsu ancestor. Bounded
