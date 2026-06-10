@@ -15,7 +15,9 @@
 //   spirit.ts      — room coercion, contract loading, active_spirit writes
 //   directives.ts  — state, EMBODY/Operator/DISMISS parsing, history strip
 //   ledger.ts      — conversation jsonl + spirit window + live context
-//   memory.ts      — Cluster C, lifted with the broad-catch bug fixed
+//   memory-sources.ts — postgres spawn wrappers + JSON-index fallback
+//   memory-rank.ts — pure matching/ranking/canon-overlay logic
+//   memory.ts      — excerpt shaping, merge/format, orchestrator, recall
 //   triggers.ts    — ultrathink keywords + coding-lessons banner
 //   index.ts       — this file, hook wiring only
 

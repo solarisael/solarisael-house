@@ -9,8 +9,11 @@
 //   deferred   (prior turn's prefetch queue, re-scored against this prompt)
 //   semantic   (qwen3-embedding:4b cosine over memory_chunks, top 5)
 //
-// Source: postgres-memory-source.py (psycopg2 + Ollama embed) spawned under
-// WSL. JSON-index fallback when the postgres source fails.
+// Split 2026-06-10 along the two natural seams:
+//   memory-sources.ts — postgres spawn wrappers + JSON-index fallback
+//   memory-rank.ts    — pure matching/ranking/canon-overlay logic
+//   memory.ts (this)  — excerpt shaping, merge/format, state lifecycle,
+//                       the orchestrator, recall, and the inject hook
 //
 // Fail-open: any pipeline error returns "" so the hook never blocks
 // message processing. Errors ALWAYS get logged (memory/retrieval_debug.log);
@@ -24,30 +27,29 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   HOUSE_MEMORY_DIRNAME,
-  MEMORY_CONCEPT_WEIGHT, MEMORY_CONTEXT_WEIGHT,
-  MEMORY_CONTENT_DEMOTION_SIM_THRESHOLD,
-  MEMORY_CONTENT_MIN_SIM, MEMORY_CONTENT_TOP_K,
+  MEMORY_CONTENT_DEMOTION_SIM_THRESHOLD, MEMORY_CONTENT_MIN_SIM,
   MEMORY_DEBUG_LOG_FILENAME, MEMORY_DEBUG_TOP_CANDIDATES,
-  MEMORY_FILE_ONE_LINE_WEIGHT,
-  MEMORY_IMPORTANT_INDEX_FILENAME, MEMORY_INDEX_FILENAME,
-  MEMORY_MAX_EXCERPT_CHARS, MEMORY_MAX_IMPORTANT_MATCHES,
-  MEMORY_MAX_INJECTION_CHARS, MEMORY_MAX_PREFETCH_QUEUE,
-  MEMORY_MAX_SYNC_INJECTIONS,
-  MEMORY_MIN_PROMPT_LEN, MEMORY_MIN_SCORE_TO_INJECT,
   MEMORY_LEXICAL_DEMOTION_SIM_THRESHOLD,
-  MEMORY_POSTGRES_SOURCE_SCRIPT, MEMORY_POSTGRES_TIMEOUT_MS,
-  MEMORY_PREFETCH_FILENAME,
-  MEMORY_RECENCY_HALF_LIFE_DAYS,
-  MEMORY_SEMANTIC_MIN_SIM, MEMORY_SEMANTIC_TOP_K,
-  MEMORY_SESSION_REPEAT_PENALTY_BASE,
-  MEMORY_STATE_FILENAME, MEMORY_STOPWORDS, MEMORY_TOKEN_RE,
+  MEMORY_MAX_EXCERPT_CHARS, MEMORY_MAX_INJECTION_CHARS,
+  MEMORY_MAX_PREFETCH_QUEUE, MEMORY_MAX_SYNC_INJECTIONS,
+  MEMORY_MIN_PROMPT_LEN,
+  MEMORY_PREFETCH_FILENAME, MEMORY_STATE_FILENAME,
 } from "./paths.ts";
-import {
-  escapeRegExp, latestUserMessage, readJson, writeJsonFile,
-} from "./util.ts";
-import { runWsl, windowsPathToWsl } from "./wsl.ts";
+import { latestUserMessage, readJson, writeJsonFile } from "./util.ts";
+import { windowsPathToWsl } from "./wsl.ts";
 import { resolveEffectiveRoomDir } from "./spirit.ts";
 import { loadState } from "./directives.ts";
+import {
+  loadMemoryContentSource, loadMemoryDateSource,
+  loadMemoryLexicalSources, loadMemorySemanticSource,
+  spawnPostgresSource,
+} from "./memory-sources.ts";
+import {
+  annotateMemoryExcerptsWithCanonRefs, boostMemoryPromptTokens,
+  buildCanonicalFileSet, collectCanonAssertions, collectCanonByMatchedFiles,
+  matchMemoryImportantTerms, rankMemoryThreads, restoreMemoryPrefetchMatches,
+  tokenizeMemory,
+} from "./memory-rank.ts";
 
 // ── debug / error logging ──────────────────────────────────────────────────
 
@@ -71,151 +73,6 @@ async function errorMemoryLog(roomDir, err) {
   // Always — even with KINTSU_MEM_DEBUG unset. Errors should never silently
   // disappear; the May 12 bug-family root cause was exactly this shape.
   await appendMemoryDebug(roomDir, `ERROR ${err?.message || err}\n${err?.stack || ""}`);
-}
-
-// ── token tooling ──────────────────────────────────────────────────────────
-
-function tokenizeMemory(text) {
-  const tokens = String(text || "").toLowerCase().match(MEMORY_TOKEN_RE) || [];
-  return new Set(tokens.filter((token) => token.length > 1 && !MEMORY_STOPWORDS.has(token)));
-}
-
-function extractMemoryConcepts(threadKey) {
-  const concepts = new Set();
-  for (const variant of String(threadKey || "").split("/")) {
-    for (const token of tokenizeMemory(variant.trim())) {
-      concepts.add(token);
-    }
-  }
-  return concepts;
-}
-
-function countTokenOverlap(left, right) {
-  let count = 0;
-  for (const token of left) {
-    if (right.has(token)) count += 1;
-  }
-  return count;
-}
-
-// ── thread ranking ─────────────────────────────────────────────────────────
-
-function collectMemoryEntryTokens(entries, filesMap) {
-  const contextTokens = new Set();
-  const fileTokens = new Set();
-  for (const entry of Array.isArray(entries) ? entries : []) {
-    for (const token of tokenizeMemory(entry?.context || "")) {
-      contextTokens.add(token);
-    }
-    const fileMeta = filesMap?.[entry?.file || ""];
-    if (fileMeta?.one_line) {
-      for (const token of tokenizeMemory(fileMeta.one_line)) {
-        fileTokens.add(token);
-      }
-    }
-  }
-  return { contextTokens, fileTokens };
-}
-
-function scoreMemoryThread(promptTokens, threadKey, entries, filesMap) {
-  const concepts = extractMemoryConcepts(threadKey);
-  const { contextTokens, fileTokens } = collectMemoryEntryTokens(entries, filesMap);
-  return (
-    countTokenOverlap(concepts, promptTokens) * MEMORY_CONCEPT_WEIGHT
-    + countTokenOverlap(contextTokens, promptTokens) * MEMORY_CONTEXT_WEIGHT
-    + countTokenOverlap(fileTokens, promptTokens) * MEMORY_FILE_ONE_LINE_WEIGHT
-  );
-}
-
-function sessionRepeatCountForThread(state, threadKey, entries = []) {
-  const hits = state?.session_memory_hits || {};
-  const counts = [hits[`thread:${threadKey}`] || 0];
-  for (const entry of Array.isArray(entries) ? entries : []) {
-    if (entry?.file) counts.push(hits[`file:${entry.file}`] || 0);
-  }
-  return Math.max(0, ...counts.map((value) => Number(value) || 0));
-}
-
-function memorySessionRepeatPenalty(repeatCount) {
-  return Math.pow(MEMORY_SESSION_REPEAT_PENALTY_BASE, Math.max(0, Number(repeatCount) || 0));
-}
-
-// ── recency decay (audit ticket #2) ────────────────────────────────────────
-// Threads inherit a recency penalty from their files' `last_touched_at`.
-// Touch-based: a thread that's been retrieved every turn keeps `last_touched_at`
-// fresh and gets no decay; a thread quietly sitting on disk for weeks
-// gets exponentially demoted. Canon-touching files are exempt entirely —
-// they're already surfaced via the canon-assertion overlay (#5) and
-// decaying them doubly is wrong.
-//
-// When `state.loaded[file].last_touched_at` is missing (file hasn't been
-// retrieved yet in this state's history), fall back to a date parsed
-// from the filename (`YYYY-MM-DD_*.md` convention); if no date, return
-// no decay (give brand-new content a fair first-shot at the score).
-
-function buildCanonicalFileSet(importantIndex) {
-  const files = new Set();
-  for (const entry of Object.values(importantIndex || {})) {
-    for (const fileRef of Array.isArray(entry?.files) ? entry.files : []) {
-      if (fileRef?.file) files.add(fileRef.file);
-    }
-  }
-  return files;
-}
-
-const DATE_IN_FILENAME_RE = /(\d{4}-\d{2}-\d{2})/;
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
-function resolveLastTouchedAtMs(filePath, loadedEntry) {
-  if (loadedEntry?.last_touched_at) {
-    const parsed = Date.parse(loadedEntry.last_touched_at);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  const match = String(filePath || "").match(DATE_IN_FILENAME_RE);
-  if (match) {
-    const parsed = Date.parse(match[1]);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  return null;
-}
-
-function computeThreadRecencyPenalty(entries, state, canonicalFiles) {
-  if (!Array.isArray(entries) || !entries.length) return 1.0;
-  const loaded = state?.loaded || {};
-  let freshestMs = 0;
-  for (const entry of entries) {
-    const file = entry?.file;
-    if (!file) continue;
-    // Canon-touching threads return early with full weight — no decay.
-    if (canonicalFiles?.has(file)) return 1.0;
-    const touchedMs = resolveLastTouchedAtMs(file, loaded[file]);
-    if (touchedMs === null) continue;
-    if (touchedMs > freshestMs) freshestMs = touchedMs;
-  }
-  if (freshestMs === 0) return 1.0; // no anchor — give benefit of the doubt
-  const ageDays = (Date.now() - freshestMs) / MS_PER_DAY;
-  if (ageDays <= 0) return 1.0;
-  return Math.exp(-Math.LN2 * ageDays / MEMORY_RECENCY_HALF_LIFE_DAYS);
-}
-
-function rankMemoryThreads(promptTokens, index, state = {}, canonicalFiles = new Set()) {
-  const ranked = [];
-  const threads = index?.threads || {};
-  const filesMap = index?.files || {};
-  for (const [threadKey, entries] of Object.entries(threads)) {
-    const rawScore = scoreMemoryThread(promptTokens, threadKey, entries, filesMap);
-    const sessionRepeatCount = sessionRepeatCountForThread(state, threadKey, entries);
-    const sessionPenalty = memorySessionRepeatPenalty(sessionRepeatCount);
-    const recencyPenalty = computeThreadRecencyPenalty(entries, state, canonicalFiles);
-    const score = rawScore * sessionPenalty * recencyPenalty;
-    if (score >= MEMORY_MIN_SCORE_TO_INJECT) {
-      ranked.push({
-        score, rawScore, sessionPenalty, sessionRepeatCount, recencyPenalty, threadKey, entries,
-      });
-    }
-  }
-  ranked.sort((a, b) => b.score - a.score);
-  return ranked;
 }
 
 // ── excerpt loading ────────────────────────────────────────────────────────
@@ -383,30 +240,6 @@ function collectMemoryContentExcerpts(chunks) {
   return excerpts;
 }
 
-// ── important-index matching ───────────────────────────────────────────────
-
-function matchMemoryTerm(promptLower, term) {
-  const target = String(term || "").trim().toLowerCase();
-  if (!target) return false;
-  return new RegExp(`\\b${escapeRegExp(target)}\\b`, "i").test(promptLower);
-}
-
-function matchMemoryImportantTerms(prompt, importantIndex) {
-  const promptLower = String(prompt || "").toLowerCase();
-  const matches = [];
-  const seen = new Set();
-  for (const [termKey, entry] of Object.entries(importantIndex || {})) {
-    if (seen.has(termKey)) continue;
-    const terms = [termKey, ...(Array.isArray(entry?.aliases) ? entry.aliases : [])];
-    if (terms.some((term) => matchMemoryTerm(promptLower, term))) {
-      matches.push({ termKey, entry });
-      seen.add(termKey);
-    }
-    if (matches.length >= MEMORY_MAX_IMPORTANT_MATCHES) break;
-  }
-  return matches;
-}
-
 async function collectMemoryImportantExcerpts(roomDir, matches) {
   const excerpts = [];
   for (const match of matches) {
@@ -429,418 +262,6 @@ async function collectMemoryImportantExcerpts(roomDir, matches) {
     }
   }
   return excerpts;
-}
-
-function boostMemoryPromptTokens(promptTokens, importantMatches) {
-  const boosted = new Set(promptTokens);
-  for (const match of importantMatches) {
-    if (Array.isArray(match.entry?.files) && match.entry.files.length) continue;
-    for (const token of tokenizeMemory(match.entry?.search_boost || "")) {
-      boosted.add(token);
-    }
-  }
-  return boosted;
-}
-
-// ── canon-assertion overlay (audit ticket #5) ──────────────────────────────
-// importantIndex entries whose pointer_files reference any file in an active
-// (top-N sync) thread match get pulled in as load-bearing CONSTRAINTS —
-// regardless of whether they appeared in the user's prompt text. This is
-// what the 2026-05-11 substrate-audit-ticket called the "biggest single win"
-// alongside tiered retrieval: canon never gets crowded out by recent-
-// dramatic content, AND canon-touching-the-current-conversation surfaces
-// even when the user didn't name it.
-//
-// Entries already matched via prompt-text (importantMatches) are excluded
-// from this overlay so they don't double-inject — they're already going to
-// land in the memory-context block via their existing path.
-
-function collectCanonAssertions(importantIndex, syncMatches, alreadyMatchedTermKeys) {
-  const activeFiles = new Set(
-    (Array.isArray(syncMatches) ? syncMatches : []).flatMap((match) =>
-      (Array.isArray(match?.entries) ? match.entries : [])
-        .map((entry) => entry?.file)
-        .filter(Boolean),
-    ),
-  );
-  if (!activeFiles.size) return [];
-
-  const assertions = [];
-  for (const [termKey, entry] of Object.entries(importantIndex || {})) {
-    if (alreadyMatchedTermKeys.has(termKey)) continue;
-    const entryFiles = (Array.isArray(entry?.files) ? entry.files : [])
-      .map((fileRef) => fileRef?.file)
-      .filter(Boolean);
-    if (!entryFiles.length) continue;
-    if (!entryFiles.some((file) => activeFiles.has(file))) continue;
-    assertions.push({ termKey, entry });
-  }
-  return assertions;
-}
-
-// ── canon reverse-index (recall): matched-file → owning-entity ─────────────
-// 2026-06-05 fix. recall's canonMatches was NAME-only (matchMemoryImportantTerms
-// fires on word-boundary match of an entity's name/aliases). That meant a query
-// like "12 inches / be gentle" could pull the bath-scene chunk — a file that IS
-// a pointer of `the protection vow` — and STILL report "0 canon entries,"
-// because the query never said "the vow." The canon was right there in the
-// retrieved file and the link back to the owning entity was simply never made.
-//
-// This reverses the index: given the source_paths of the chunks recall actually
-// surfaced (semantic + content + date), find any canon entry whose pointer
-// files include one of them. Deduped against the name-match termKeys so an
-// entry matched both ways isn't double-counted. Path normalization mirrors
-// the python side's house/ rendering prefix (load_semantic_chunks strips it;
-// here we compare both bare and prefixed forms to be safe).
-function collectCanonByMatchedFiles(importantIndex, matchedSourcePaths, alreadyMatchedTermKeys) {
-  const matched = new Set();
-  for (const raw of Array.isArray(matchedSourcePaths) ? matchedSourcePaths : []) {
-    const p = String(raw || "").trim();
-    if (!p) continue;
-    matched.add(p);
-    // also add the house-prefix-stripped form so entity pointers (bare paths)
-    // match chunks rendered with the cross-room "house/" prefix.
-    if (p.startsWith(`${HOUSE_MEMORY_DIRNAME}/`)) {
-      matched.add(p.slice(HOUSE_MEMORY_DIRNAME.length + 1));
-    }
-  }
-  if (!matched.size) return [];
-
-  const out = [];
-  for (const [termKey, entry] of Object.entries(importantIndex || {})) {
-    if (alreadyMatchedTermKeys?.has(termKey)) continue;
-    const entryFiles = (Array.isArray(entry?.files) ? entry.files : [])
-      .map((fileRef) => fileRef?.file)
-      .filter(Boolean);
-    if (!entryFiles.length) continue;
-    if (!entryFiles.some((file) => matched.has(file))) continue;
-    out.push({ termKey, entry, via: "pointer-file" });
-  }
-  return out;
-}
-
-// ── canon cross-reference annotation (audit ticket #3) ────────────────────
-// Conservative lexical version: for each memory excerpt, scan its body for
-// any canon term/alias that's already surfaced this turn (via importantMatches
-// or canonAssertions). Tag the excerpt with `canon_refs: [termKey, ...]` so
-// formatMemoryContextBlock can render a cross-reference hint.
-//
-// We don't try to detect actual semantic *disagreement* — that's a meaning
-// operation, requires LLM help, out of scope for v1. The cross-ref label
-// just gives the model the bridge metadata; the model itself decides
-// whether canon framing wins in any specific tension.
-//
-// Self-references skipped per-term, not per-excerpt — an `important_index:X`
-// excerpt's body IS the X entry's summary, but it can still reference OTHER
-// canon entries that should be flagged.
-
-function annotateMemoryExcerptsWithCanonRefs(
-  finalExcerpts,
-  surfacedCanonTermKeys,
-  importantIndex,
-) {
-  if (
-    !Array.isArray(finalExcerpts) || !finalExcerpts.length
-    || !surfacedCanonTermKeys?.size
-    || !importantIndex
-  ) return;
-  for (const excerpt of finalExcerpts) {
-    const body = String(excerpt?.text || "").toLowerCase();
-    if (!body) continue;
-    const source = String(excerpt?.source || "");
-    const selfTermKey = source.startsWith("important_index:")
-      ? source.slice("important_index:".length)
-      : null;
-    const refs = new Set();
-    for (const termKey of surfacedCanonTermKeys) {
-      if (termKey === selfTermKey) continue;
-      const entry = importantIndex[termKey];
-      if (!entry) continue;
-      const terms = [termKey, ...(Array.isArray(entry?.aliases) ? entry.aliases : [])];
-      if (terms.some((term) => matchMemoryTerm(body, term))) {
-        refs.add(termKey);
-      }
-    }
-    if (refs.size) {
-      excerpt.canon_refs = Array.from(refs);
-    }
-  }
-}
-
-// ── postgres source spawn ──────────────────────────────────────────────────
-// Two-stage flow per audit ticket #1 (tiered retrieval):
-//   Stage 1 — lexical: load index + importantIndex (Pass 1). No embed.
-//   Stage 2 — semantic: embed prompt + narrowed cosine on active-thread files
-//             (Pass 2). Only called after plugin has ranked Pass 1 threads.
-// spawnPostgresSource is the shared spawn machinery; the two wrappers below
-// just build the right argv for each mode.
-
-async function spawnPostgresSource(roomDir, args, prompt) {
-  const outcome = await runWsl({
-    argv: ["python3", windowsPathToWsl(MEMORY_POSTGRES_SOURCE_SCRIPT), ...args],
-    cwd: roomDir,
-    // Prompt rides stdin (avoids argv-length issues on long prompts).
-    stdin: String(prompt || ""),
-    timeoutMs: MEMORY_POSTGRES_TIMEOUT_MS,
-  });
-  if (outcome.timedOut) return { ok: false, error: "postgres source timed out" };
-  if (outcome.spawnError) return { ok: false, error: outcome.spawnError };
-  if (outcome.code !== 0) {
-    return { ok: false, error: outcome.stderr.trim() || `postgres source exited ${outcome.code}` };
-  }
-  try {
-    return { ok: true, data: JSON.parse(outcome.stdout), stderr: outcome.stderr.trim() };
-  } catch (err) {
-    return { ok: false, error: err?.message || String(err) };
-  }
-}
-
-function runMemoryPostgresLexical(roomDir, roomName, prompt) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
-  const args = [
-    "--room-dir", windowsPathToWsl(roomDir),
-    "--mode", "lexical",
-  ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
-  return spawnPostgresSource(roomDir, args, prompt);
-}
-
-function runMemoryPostgresSemantic(roomDir, roomName, prompt, scopeFiles) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
-  const args = [
-    "--room-dir", windowsPathToWsl(roomDir),
-    "--mode", "semantic",
-    "--semantic-top-k", String(MEMORY_SEMANTIC_TOP_K),
-    "--semantic-min-sim", String(MEMORY_SEMANTIC_MIN_SIM),
-  ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
-  if (Array.isArray(scopeFiles) && scopeFiles.length) {
-    args.push("--scope-files", scopeFiles.join(","));
-  }
-  return spawnPostgresSource(roomDir, args, prompt);
-}
-
-// Date mode wrapper. Added 2026-05-23. Always GLOBAL — date hits are
-// direct authoritative lookups against memories.dates GIN, the user/dragon
-// literally named a date and this returns memories tagged with it. No
-// embed, no scope-narrowing, cheap due to the GIN index.
-function runMemoryPostgresDate(roomDir, roomName, prompt) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
-  const args = [
-    "--room-dir", windowsPathToWsl(roomDir),
-    "--mode", "date",
-  ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
-  return spawnPostgresSource(roomDir, args, prompt);
-}
-
-// Content (pg_trgm word_similarity) mode wrapper. Unlike semantic, content
-// is GLOBAL by default — the whole point of this pass is to catch chunks
-// the lexical thread-ranking missed entirely. Scope-files honored only when
-// caller explicitly wants narrowing (matches semantic-pass behavior for
-// back-compat).
-function runMemoryPostgresContent(roomDir, roomName, prompt, scopeFiles) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
-  const args = [
-    "--room-dir", windowsPathToWsl(roomDir),
-    "--mode", "content",
-    "--content-top-k", String(MEMORY_CONTENT_TOP_K),
-    "--content-min-sim", String(MEMORY_CONTENT_MIN_SIM),
-  ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
-  if (Array.isArray(scopeFiles) && scopeFiles.length) {
-    args.push("--scope-files", scopeFiles.join(","));
-  }
-  return spawnPostgresSource(roomDir, args, prompt);
-}
-
-// ── JSON fallback (when postgres source fails) ────────────────────────────
-
-async function loadMemoryImportantIndex(roomDir) {
-  const data = await readJson(path.join(roomDir, MEMORY_IMPORTANT_INDEX_FILENAME), null);
-  return data?.entries && typeof data.entries === "object" ? data.entries : {};
-}
-
-function prefixHouseMemoryIndex(index) {
-  if (!index || typeof index !== "object") return null;
-  const files = {};
-  for (const [filePath, meta] of Object.entries(index.files || {})) {
-    files[`${HOUSE_MEMORY_DIRNAME}/${filePath}`] = meta;
-  }
-  const threads = {};
-  for (const [threadKey, entries] of Object.entries(index.threads || {})) {
-    threads[`house / ${threadKey}`] = (Array.isArray(entries) ? entries : []).map((entry) => ({
-      ...entry,
-      file: `${HOUSE_MEMORY_DIRNAME}/${entry?.file || ""}`,
-      context: `Shared house memory. ${entry?.context || ""}`.trim(),
-    }));
-  }
-  return { files, threads };
-}
-
-function mergeMemoryIndexes(...indexes) {
-  const merged = { files: {}, threads: {} };
-  for (const index of indexes) {
-    if (!index) continue;
-    Object.assign(merged.files, index.files || {});
-    for (const [threadKey, entries] of Object.entries(index.threads || {})) {
-      if (!merged.threads[threadKey]) {
-        merged.threads[threadKey] = entries;
-        continue;
-      }
-      merged.threads[threadKey] = [
-        ...merged.threads[threadKey],
-        ...(Array.isArray(entries) ? entries : []),
-      ];
-    }
-  }
-  return merged;
-}
-
-async function loadHouseMemoryIndex(roomDir) {
-  const sharedRoot = path.dirname(roomDir);
-  const houseIndexPath = path.join(sharedRoot, HOUSE_MEMORY_DIRNAME, MEMORY_INDEX_FILENAME);
-  const index = await readJson(houseIndexPath, null);
-  return prefixHouseMemoryIndex(index);
-}
-
-async function loadMemoryIndexFromJson(roomDir) {
-  const roomIndex = await readJson(path.join(roomDir, MEMORY_INDEX_FILENAME), null);
-  if (!roomIndex) return null;
-  return mergeMemoryIndexes(roomIndex, await loadHouseMemoryIndex(roomDir));
-}
-
-async function loadMemoryLexicalSources(roomDir, roomName, prompt) {
-  const fromPostgres = await runMemoryPostgresLexical(roomDir, roomName, prompt);
-  if (fromPostgres.ok && fromPostgres.data?.index) {
-    return {
-      index: fromPostgres.data.index,
-      importantIndex: fromPostgres.data.importantIndex || {},
-      indexSource: "postgres",
-      importantSource: "postgres",
-      fallbackReason: null,
-    };
-  }
-  return {
-    index: await loadMemoryIndexFromJson(roomDir),
-    importantIndex: await loadMemoryImportantIndex(roomDir),
-    indexSource: "json",
-    importantSource: "json",
-    fallbackReason: fromPostgres.error || "postgres source unavailable",
-  };
-}
-
-async function loadMemorySemanticSource(roomDir, roomName, prompt, scopeFiles) {
-  // Skip the call entirely when there's nothing to embed against or no scope
-  // to narrow against. The audit-ticket #1 design says semantic Pass 2 only
-  // fires for files in active threads; if the prompt produced zero ranked
-  // matches, there's no scope, so we skip semantic entirely (saves an embed
-  // roundtrip AND keeps the off-axis "find anything kinda related" hits
-  // from leaking back in via room-wide fallback).
-  if (!prompt || !Array.isArray(scopeFiles) || !scopeFiles.length) {
-    return {
-      semanticChunks: [],
-      semanticSource: "skip-no-scope",
-      semanticStderr: "",
-    };
-  }
-  const fromPostgres = await runMemoryPostgresSemantic(roomDir, roomName, prompt, scopeFiles);
-  if (fromPostgres.ok && Array.isArray(fromPostgres.data?.semanticChunks)) {
-    const chunks = fromPostgres.data.semanticChunks;
-    return {
-      semanticChunks: chunks,
-      semanticSource: chunks.length ? "postgres-narrowed" : "postgres-empty",
-      semanticStderr: fromPostgres.stderr || "",
-    };
-  }
-  return {
-    semanticChunks: [],
-    semanticSource: "unavailable",
-    semanticStderr: fromPostgres.error || "postgres source unavailable",
-  };
-}
-
-// Date source (added 2026-05-23 — date-aware retrieval fix). Always GLOBAL,
-// no embed. Returns memories whose `dates` array intersects any YYYY-MM-DD
-// token extracted from the prompt. Fail-open: any failure produces an empty
-// array. Skip entirely when prompt has no date tokens — the python side
-// also short-circuits but skipping here avoids the WSL spawn overhead.
-async function loadMemoryDateSource(roomDir, roomName, prompt) {
-  if (!prompt) {
-    return {
-      dateMatches: [],
-      queryDates: [],
-      dateSource: "skip-no-prompt",
-      dateStderr: "",
-    };
-  }
-  // Cheap pre-flight: if no YYYY-MM-DD token in the prompt, skip the spawn.
-  // The python side regex is authoritative; this mirror just saves the
-  // wsl.exe roundtrip when the user prompt has no date at all.
-  if (!/\b\d{4}-\d{2}-\d{2}\b/.test(prompt)) {
-    return {
-      dateMatches: [],
-      queryDates: [],
-      dateSource: "skip-no-date-token",
-      dateStderr: "",
-    };
-  }
-  const fromPostgres = await runMemoryPostgresDate(roomDir, roomName, prompt);
-  if (fromPostgres.ok && Array.isArray(fromPostgres.data?.dateMatches)) {
-    const matches = fromPostgres.data.dateMatches;
-    const queryDates = Array.isArray(fromPostgres.data?.queryDates)
-      ? fromPostgres.data.queryDates
-      : [];
-    return {
-      dateMatches: matches,
-      queryDates,
-      dateSource: matches.length ? "postgres-hit" : "postgres-empty",
-      dateStderr: fromPostgres.stderr || "",
-    };
-  }
-  return {
-    dateMatches: [],
-    queryDates: [],
-    dateSource: "unavailable",
-    dateStderr: fromPostgres.error || "postgres source unavailable",
-  };
-}
-
-// Content source (added 2026-05-19 zeal pass). Always GLOBAL — the entire
-// purpose of this pass is to catch chunks the lexical-thread-ranking missed
-// (off-axis files with isolated proper-noun mentions). Cheap due to the
-// pg_trgm GIN on memory_chunks.body, no embed roundtrip needed.
-async function loadMemoryContentSource(roomDir, roomName, prompt) {
-  if (!prompt) {
-    return {
-      contentChunks: [],
-      contentSource: "skip-no-prompt",
-      contentStderr: "",
-    };
-  }
-  // No scopeFiles passed — content runs global.
-  const fromPostgres = await runMemoryPostgresContent(roomDir, roomName, prompt, null);
-  if (fromPostgres.ok && Array.isArray(fromPostgres.data?.contentChunks)) {
-    const chunks = fromPostgres.data.contentChunks;
-    return {
-      contentChunks: chunks,
-      contentSource: chunks.length ? "postgres-global" : "postgres-empty",
-      contentStderr: fromPostgres.stderr || "",
-    };
-  }
-  return {
-    contentChunks: [],
-    contentSource: "unavailable",
-    contentStderr: fromPostgres.error || "postgres source unavailable",
-  };
 }
 
 // ── merge + format ─────────────────────────────────────────────────────────
@@ -983,25 +404,6 @@ function buildMemoryPrefetchQueue(matches, currentTurn) {
     entries: match.entries,
     queued_at_turn: currentTurn,
   }));
-}
-
-function restoreMemoryPrefetchMatches(prefetch, promptTokens, index, state, canonicalFiles) {
-  if (!promptTokens?.size) return [];
-  return (Array.isArray(prefetch) ? prefetch : [])
-    .map((item) => {
-      const threadKey = item?.thread_key || "prefetch";
-      const entries = item?.entries || [];
-      const rawScore = scoreMemoryThread(promptTokens, threadKey, entries, index?.files || {});
-      const recencyPenalty = computeThreadRecencyPenalty(entries, state, canonicalFiles);
-      return {
-        score: rawScore * recencyPenalty,
-        rawScore,
-        recencyPenalty,
-        threadKey,
-        entries,
-      };
-    })
-    .filter((match) => match.score >= MEMORY_MIN_SCORE_TO_INJECT);
 }
 
 function formatMemoryCandidateDebugLine(match, selected) {
