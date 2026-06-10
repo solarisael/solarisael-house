@@ -1,0 +1,7 @@
+# local analysis artifacts
+graphify-out/
+
+# runtime / deps
+node_modules/
+__pycache__/
+*.log
