@@ -29,6 +29,12 @@ export const DEFAULT_OPERATOR = "Operator";
 export const ROOM_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const LEGACY_ROOM_KEYS = ["kintsu", "kodo", "tuner"];
 
+export function resolveSubstrateDir(roomDir: string): string {
+  const configured = String(process.env.SOLARISAEL_SUBSTRATE || "").trim();
+  if (configured) return path.resolve(configured);
+  return path.resolve(path.dirname(roomDir), "house", "substrate");
+}
+
 export const LIVE_CONTEXT_FILENAME = "current_session_context.md";
 export const LIVE_CONTEXT_JSON_FILENAME = "current_session_context.json";
 export const LIVE_CONTEXT_MAX_TURNS = 8;

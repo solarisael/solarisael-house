@@ -35,7 +35,6 @@ Read [`HOUSE.md`](./HOUSE.md) for the personal history and design philosophy beh
 | [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) | Identity and room design |
 | [`HOUSE.md`](./HOUSE.md) | Personal history and project philosophy |
 | [`docs/roadmap.md`](./docs/roadmap.md) | Planned work and release direction |
-| [`evals/README.md`](./evals/README.md) | Retrieval evaluation tools and limits |
 
 ## What the system provides
 
@@ -108,19 +107,6 @@ remember → recall → sleep → wake
 
 Not every action runs automatically. This default keeps memory writes, corrections, and identity changes deliberate.
 
-### Retrieval evaluation
-
-The repository includes evaluation tools for ranking behavior, route attribution, and real-use observation.
-
-```console
-bun run test
-bun run test:recall
-bun run eval:synthetic
-bun run eval:id-ranking
-bun run eval:daily
-```
-
-A non-empty retrieval is not proof of a useful match. Review the retrieved evidence and the model response before making a quality claim.
 
 ## Deployment modes
 
@@ -180,6 +166,8 @@ Native Linux integration may require adapter work and verification. macOS remain
 
 Solarisael House expects a tool-capable AI to install and configure it with the operator.
 
+For OMP, install the public [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp) adapter beside this repository. The two directories must be siblings unless `SOLARISAEL_HOUSE_CORE` points to the core explicitly.
+
 The installing AI must:
 
 1. Ask which continuity behavior the operator wants.
@@ -226,7 +214,7 @@ Do not publish raw turns, source paths, entities, thread names, or private retri
 
 ## Repository boundaries
 
-This repository owns the core routing, retrieval presentation, room behavior, evaluation tools, and shared memory logic.
+This repository owns core routing, retrieval presentation, room behavior, and shared memory logic.
 
 The public [Full House substrate](https://github.com/solarisael/solarisael-house-substrate) owns:
 

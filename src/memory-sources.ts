@@ -12,6 +12,7 @@ import {
   MEMORY_IMPORTANT_INDEX_FILENAME, MEMORY_INDEX_FILENAME,
   MEMORY_POSTGRES_SOURCE_SCRIPT, MEMORY_POSTGRES_TIMEOUT_MS,
   MEMORY_SEMANTIC_MIN_SIM, MEMORY_SEMANTIC_TOP_K,
+  resolveSubstrateDir,
 } from "./paths.ts";
 import { normalizeRoomName } from "./spirit.ts";
 import { readJson } from "./util.ts";
@@ -27,7 +28,13 @@ import { runWsl, windowsPathToWsl } from "./wsl.ts";
 
 export async function spawnPostgresSource(roomDir, args, prompt) {
   const outcome = await runWsl({
-    argv: ["python3", windowsPathToWsl(MEMORY_POSTGRES_SOURCE_SCRIPT), ...args],
+    argv: [
+      "python3",
+      windowsPathToWsl(MEMORY_POSTGRES_SOURCE_SCRIPT),
+      "--substrate-dir",
+      windowsPathToWsl(resolveSubstrateDir(roomDir)),
+      ...args,
+    ],
     cwd: roomDir,
     // Prompt rides stdin (avoids argv-length issues on long prompts).
     stdin: String(prompt || ""),

@@ -13,6 +13,16 @@ The AI should execute the protocol below. The person should not need to translat
 If you are the installing AI, read this file and `IDENTITY_GUIDE.md` before changing anything.
 After installation, read `USAGE.md` together for the deliberate recall, memory, lesson, sleep, wake, correction, and multi-room workflows.
 
+This core repository does not contain the OMP adapter or room template. Get the public adapter from [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp), then keep both repositories as siblings:
+
+```text
+<BUNDLE>\
+  solarisael-house\
+  solarisael-house-omp\
+```
+
+The adapter repository supplies `starter-room/example`.
+
 ## Language and filesystem contract
 
 The House deliberately uses relational language while retaining exact technical meanings:
@@ -95,7 +105,7 @@ Confirm and report:
 - Windows is running.
 - `omp` is installed and callable.
 - `bun` is installed and callable.
-- The extracted bundle contains sibling folders named `solarisael-house` and `solarisael-house-omp`.
+- The bundle contains sibling clones or release archives of [`solarisael-house`](https://github.com/solarisael/solarisael-house) and [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp).
 - The intended OMP config path. Default: `%USERPROFILE%\.omp\agent\config.yml`.
 - Whether a Solarisael vault/room root already exists. Default for new installations: `%USERPROFILE%\Solarisael`.
 
