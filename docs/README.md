@@ -7,7 +7,6 @@ Keep room/private memory in the Solarisael vault. Keep project state, implementa
 ## Files
 
 - `progress.md` — current operational state: what exists, what is verified, what is still open.
-- `changelog.md` — most recent changes first, compact and release-note shaped.
 - `roadmap.md` — current and future goals, including memory/retrieval phases.
 - `history/YYYY-MM-DD.md` — daily project history. One file per day.
 

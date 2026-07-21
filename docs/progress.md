@@ -129,7 +129,6 @@ Run on 2026-07-04:
 
 ```text
 C:/Projects/solarisael-house          bun test -> 46 pass, 0 fail
-C:/Projects/solarisael-house          bun run tests/recall.integration.ts -> all expectations met
 C:/Projects/solarisael-house          python py_compile helpers -> passed
 C:/Projects/solarisael-house-omp      bun test -> 12 pass, 0 fail
 ```
@@ -139,7 +138,6 @@ Run on 2026-07-01:
 ```text
 C:/Projects/solarisael-house       bun test tests/retrieval-candidates.test.ts -> 7 pass, 0 fail
 C:/Projects/solarisael-house       bun test                         -> 26 pass, 0 fail
-C:/Projects/solarisael-house       bun run tests/recall.integration.ts -> all expectations met
 C:/Projects/solarisael-house       python py_compile helpers          -> passed
 C:/Projects/solarisael-house-opencode bun test                       -> 31 pass, 0 fail
 ```

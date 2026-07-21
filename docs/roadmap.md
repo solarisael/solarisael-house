@@ -393,7 +393,6 @@ When runtime behavior changes, update:
 
 ```text
 docs/progress.md
-docs/changelog.md
 docs/history/YYYY-MM-DD.md
 ```
 
