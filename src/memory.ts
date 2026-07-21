@@ -1019,10 +1019,10 @@ export async function injectRoomMemoryContext(output, paths = {}) {
 
   const sessionID = message.info?.sessionID || message.parts?.[0]?.sessionID || null;
 
-  // loadState is only consulted to keep parity with the prior signature;
-  // resolveEffectiveRoomDir no longer takes state hints (cwd authority).
+  // Invalid or missing room paths fail closed; never borrow cwd or another room.
   await loadState(sessionID);
   const effectiveRoomDir = resolveEffectiveRoomDir(paths.roomDir);
+  if (!effectiveRoomDir) return;
   const roomBaseName = normalizeRoomName(path.basename(effectiveRoomDir));
   if (!roomBaseName) return;
 

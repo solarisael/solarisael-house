@@ -12,14 +12,14 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   DEFAULT_AGENT_NAME, DEFAULT_OPERATOR, DEFAULT_SPIRIT,
-  LEGACY_ROOM_KEYS, ROOM_KEY_PATTERN,
+  LEGACY_ROOM_KEYS, RESERVED_ROOM_KEYS, ROOM_KEY_PATTERN,
   RUNTIME_DIR, SPIRIT_CONTRACT_OUTPUT, SPIRIT_DIR,
 } from "./paths.ts";
 import { readOptionalText } from "./util.ts";
 
 const spiritCache = new Map();
 const legacyRoomKeys = new Set(LEGACY_ROOM_KEYS);
-
+const reservedRoomKeys = new Set(RESERVED_ROOM_KEYS);
 function safeIdentityName(value) {
   const candidate = String(value ?? "");
   if (!candidate || candidate === "." || candidate === "..") return null;
@@ -34,16 +34,19 @@ export function resolveRoomDir(pluginInput) {
 }
 
 export function resolveSharedRoot(roomDir) {
-  return path.dirname(roomDir || process.cwd());
+  return roomDir ? path.dirname(roomDir) : null;
 }
 
 export function isValidRoomKey(value) {
-  return typeof value === "string" && ROOM_KEY_PATTERN.test(value);
+  return typeof value === "string"
+    && !reservedRoomKeys.has(value.toLowerCase())
+    && ROOM_KEY_PATTERN.test(value);
 }
 
 export function normalizeRoomName(value) {
   if (typeof value !== "string" || !value) return null;
   const normalized = value.toLowerCase();
+  if (reservedRoomKeys.has(normalized)) return null;
   if (isValidRoomKey(value)) return value;
   // Existing persisted markers used title-cased legacy room names.
   return legacyRoomKeys.has(normalized) ? normalized : null;
@@ -58,42 +61,12 @@ export async function normalizeSpirit(value) {
   return requested || null;
 }
 
-// Walk UP from a directory looking for a kodo/kintsu ancestor. Bounded
-// depth so it can't run away on weird filesystems.
-function findRoomAncestor(startDir) {
-  let current = path.resolve(String(startDir || ""));
-  if (!current) return null;
-
-  for (let i = 0; i < 12; i += 1) {
-    if (normalizeRoomName(path.basename(current))) return current;
-    const parent = path.dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
-
-  return null;
-}
-
-// Resolve which room directory we're actually operating in. cwd authority
-// beats state-hint authority — the headline 2026-05-04 fix. After the
-// fix, the state-hint fallback branch became dead in practice; dropped
-// here as part of the lean rewrite.
-//
-//   1. roomDir basename is a room → use it
-//   2. walk up from cwd → use first room ancestor found
-//   3. walk up from roomDir → use first room ancestor found
-//   4. give up; return base
+// Resolve only the explicitly supplied room directory. Invalid or missing
+// inputs fail closed instead of borrowing cwd or another room's identity.
 export function resolveEffectiveRoomDir(roomDir) {
-  const base = path.resolve(String(roomDir || process.cwd()));
-  if (normalizeRoomName(path.basename(base))) return base;
-
-  const cwdRoomDir = findRoomAncestor(process.cwd());
-  if (cwdRoomDir) return cwdRoomDir;
-
-  const baseRoomDir = findRoomAncestor(base);
-  if (baseRoomDir) return baseRoomDir;
-
-  return base;
+  if (typeof roomDir !== "string" || !roomDir.trim()) return null;
+  const base = path.resolve(roomDir);
+  return normalizeRoomName(path.basename(base)) ? base : null;
 }
 
 // Return the validated room key for the effective directory. Legacy room

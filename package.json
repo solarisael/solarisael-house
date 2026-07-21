@@ -10,7 +10,6 @@
   "scripts": {
     "test": "bun test && python -m unittest discover -s src -p \"test_*.py\"",
     "test:api": "bun test tests/api-contract.test.ts",
-    "test:python": "python -m unittest discover -s src -p \"test_*.py\"",
-    "test:recall": "bun run tests/recall.integration.ts"
+    "test:python": "python -m unittest discover -s src -p \"test_*.py\""
   }
 }

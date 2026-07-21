@@ -7,9 +7,11 @@
 // duplication lesson demands — a fix here lands once, for every harness.
 
 import {
+  DEFAULT_ROOM_CONTEXT,
   KEYWORD_TRIGGERS, NUDGE_BAND_SIZE, NUDGE_EVERY_TOKENS,
   PROCESS_SHAPE_TRIGGERS, ROOM_CONTEXT,
 } from "./constants.ts";
+import { RESERVED_ROOM_KEYS, ROOM_KEY_PATTERN } from "./paths.ts";
 
 // The boundary between harness and core. Every countable surface of a turn
 // is a field here so the core sees the WHOLE context, not just visible text.
@@ -53,8 +55,9 @@ export function computeContextNudge(
   { messages, room, lastBand = 0 }:
   { messages: NormalizedMessage[]; room: string; lastBand?: number },
 ): NudgeDecision | null {
-  const cfg = ROOM_CONTEXT[String(room || "").toLowerCase()];
-  if (!cfg) return null;
+  const roomName = String(room || "").toLowerCase();
+  if (!ROOM_KEY_PATTERN.test(roomName) || RESERVED_ROOM_KEYS.includes(roomName)) return null;
+  const cfg = ROOM_CONTEXT[roomName] || DEFAULT_ROOM_CONTEXT;
 
   const tokens = estimateContextTokens(messages);
   const band = Math.floor(tokens / NUDGE_EVERY_TOKENS);

@@ -59,14 +59,18 @@ except ImportError:
     psycopg2 = None
     psycopg2_extras = None
 
-
 ROOM_KEY_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+RESERVED_ROOM_KEYS = {"house"}
 
 
 def resolve_room_name(room: str | None, room_dir: Path) -> str:
     """Resolve and validate the requested room without substituting another room."""
     candidate = room if room is not None else room_dir.name
-    if not isinstance(candidate, str) or not ROOM_KEY_PATTERN.fullmatch(candidate):
+    if (
+        not isinstance(candidate, str)
+        or candidate.lower() in RESERVED_ROOM_KEYS
+        or not ROOM_KEY_PATTERN.fullmatch(candidate)
+    ):
         raise ValueError(f"invalid room key: {candidate!r}")
     return candidate
 

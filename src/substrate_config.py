@@ -87,7 +87,10 @@ def resolve_substrate_dir(
         raw = os.fspath(configured).strip()
         if not raw:
             raise SubstrateConfigError(f"{source} must name a substrate directory")
-        resolved = _resolved_path(raw)
+        converted = windows_path_to_wsl(raw)
+        if not Path(converted).is_absolute():
+            raise SubstrateConfigError(f"{source} must be an absolute path")
+        resolved = Path(converted).expanduser().resolve(strict=False)
     else:
         if room_dir is None:
             raise SubstrateConfigError(

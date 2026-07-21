@@ -114,9 +114,10 @@ async function appendConversationLedger(entry) {
 
 export async function resolveLiveContextTargets(roomDir = process.cwd()) {
   const effectiveRoomDir = resolveEffectiveRoomDir(roomDir);
+  if (!effectiveRoomDir) return null;
   const effectiveSharedRoot = resolveSharedRoot(effectiveRoomDir);
   const roomName = normalizeRoomName(path.basename(effectiveRoomDir));
-  if (!roomName) return null;
+  if (!roomName || !effectiveSharedRoot) return null;
 
   try {
     await stat(path.join(effectiveSharedRoot, "shared_current_state.md"));

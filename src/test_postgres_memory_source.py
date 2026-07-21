@@ -26,6 +26,13 @@ class PostgresMemorySourceRoomTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "invalid room key"):
                         source.resolve_room_name(invalid, room_dir)
 
+    def test_reserved_house_room_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            room_dir = Path(temp_dir) / "custom-room"
+            room_dir.mkdir()
+            with self.assertRaisesRegex(ValueError, "invalid room key"):
+                source.resolve_room_name("house", room_dir)
+
 
 if __name__ == "__main__":
     unittest.main()

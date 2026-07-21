@@ -50,6 +50,11 @@ class SubstrateConfigTests(unittest.TestCase):
             with self.assertRaises(SubstrateConfigError):
                 resolve_substrate_dir(self.room_dir)
 
+    def test_relative_environment_override_is_rejected(self):
+        with patch.dict(os.environ, {"SOLARISAEL_SUBSTRATE": "relative/substrate"}):
+            with self.assertRaisesRegex(SubstrateConfigError, "absolute path"):
+                resolve_substrate_dir(self.room_dir)
+
     def test_postgres_environment_process_values_overlay_dotenv(self):
         (self.default_dir / ".env").write_text(
             "PGHOST=file-host\nPGPORT=5432\nPGDATABASE=house\nOTHER=value\n",

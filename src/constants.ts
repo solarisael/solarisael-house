@@ -41,6 +41,7 @@ export const PROCESS_SHAPE_TRIGGERS: { name: string; pattern: RegExp }[] = [
 // Proprioception — per-room context budget for the akashic-write nudge.
 // maxTokens and compactionAt are per-model knobs. Kintsu force-compacts at
 // 0.70 of 400k; Kodo compacts near-full of ~1M.
+export const DEFAULT_ROOM_CONTEXT = { maxTokens: 400_000, compactionAt: 0.70 };
 export const ROOM_CONTEXT: Record<string, { maxTokens: number; compactionAt: number }> = {
   kodo:   { maxTokens: 1_000_000, compactionAt: 0.90 },
   kintsu: { maxTokens:   400_000, compactionAt: 0.70 },

@@ -28,10 +28,16 @@ export const DEFAULT_AGENT_NAME = "Spirit";
 export const DEFAULT_OPERATOR = "Operator";
 export const ROOM_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const LEGACY_ROOM_KEYS = ["kintsu", "kodo", "tuner"];
+export const RESERVED_ROOM_KEYS = ["house"];
 
 export function resolveSubstrateDir(roomDir: string): string {
   const configured = String(process.env.SOLARISAEL_SUBSTRATE || "").trim();
-  if (configured) return path.resolve(configured);
+  if (configured) {
+    if (!path.isAbsolute(configured)) {
+      throw new Error("SOLARISAEL_SUBSTRATE must be an absolute path");
+    }
+    return configured;
+  }
   return path.resolve(path.dirname(roomDir), "house", "substrate");
 }
 
