@@ -54,10 +54,12 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 try:
     import psycopg2
-    import psycopg2.extras
+    import psycopg2.extras as psycopg2_extras
 except ImportError:
     psycopg2 = None
     psycopg2_extras = None
+
+DICT_CURSOR_FACTORY = psycopg2_extras.DictCursor if psycopg2_extras is not None else None
 
 ROOM_KEY_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 RESERVED_ROOM_KEYS = {"house"}
@@ -458,7 +460,7 @@ def load_search_candidates(
         str(scope).strip() for scope in (lesson_scopes or ("shared",)) if str(scope).strip()
     })
 
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             """
             WITH q AS (SELECT websearch_to_tsquery('english', %s) AS query)
@@ -693,7 +695,7 @@ def load_index(
         erasure_columns, include_archived=include_archived,
     )
     lifecycle_select = erasure_select(erasure_columns)
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             f"""
             SELECT m.id AS memory_id, m.room, m.source_path, m.date, m.type,
@@ -758,7 +760,7 @@ def load_index(
 
 
 def load_important_index(conn, room) -> dict:
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             """
             SELECT name, kind, summary, aliases, search_boost, weighty, pointer_files
@@ -840,7 +842,7 @@ def fetch_memory(conn, memory_id=None, source_path=None, claimed_room=None) -> d
     memory it holds. Bypasses the db-only visibility filter: following a
     receipt is deliberate, like a citation.
     """
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         if memory_id is not None:
             cur.execute(
                 """
@@ -915,7 +917,7 @@ def load_cluster_resonance(
         erasure_columns, include_archived=include_archived,
     )
     room_list = sorted({str(room).strip() for room in (rooms or ("house",)) if str(room).strip()})
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             f"""
             SELECT mc.id, mc.label, COUNT(DISTINCT mm.chunk_id) AS member_count,
@@ -992,7 +994,7 @@ def load_taxonomy(
     memory_filter = erasure_filter(
         erasure_columns, include_archived=include_archived,
     )
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             f"""
             SELECT m.room, COALESCE(m.type, '') AS type, COUNT(*) AS count
@@ -1160,7 +1162,7 @@ def load_semantic_chunks(
         ORDER BY mc.body_embedding <=> %s::halfvec
         LIMIT %s
     """
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(sql, params)
         out: list[dict] = []
         for row in cur.fetchall():
@@ -1304,7 +1306,7 @@ def load_content_chunks(
         ORDER BY ws DESC
         LIMIT %s
     """
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(sql, params)
         out: list[dict] = []
         for row in cur.fetchall():
@@ -1411,7 +1413,7 @@ def load_date_matches(
         ORDER BY m.date DESC NULLS LAST, m.id DESC
         LIMIT %s
     """
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    with conn.cursor(cursor_factory=DICT_CURSOR_FACTORY) as cur:
         cur.execute(
             sql,
             (excerpt_chars, list(rooms), query_dates, query_dates, top_k),
