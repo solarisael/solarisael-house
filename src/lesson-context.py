@@ -79,11 +79,13 @@ def retrieve_lesson_context(conn, room: str, projects=(), shapes=(), terms=(), l
         cur.execute("""SELECT id,title,lesson,proof_pattern,trigger_context,scope,project,voice,shape,tags
                        FROM coding_lessons WHERE scope = ANY(%s)""", (scopes,))
         coding = [_row(r) for r in cur.fetchall()]
+        coding = [row for row in coding if _norm(row.get("scope")) in scopes]
         project = []
         if project_keys:
             cur.execute("""SELECT id,title,lesson,proof_pattern,trigger_context,scope,project,voice,shape,tags
                            FROM project_lessons WHERE project = ANY(%s)""", (sorted(project_keys),))
             project = [_row(r) for r in cur.fetchall()]
+            project = [row for row in project if _norm(row.get("project")) in project_keys]
     finally:
         cur.close()
     def ranked(rows):

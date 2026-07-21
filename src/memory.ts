@@ -745,20 +745,55 @@ export function recallRouteSkipArgs(queryRoute) {
   if (!lanes.date) args.push("--skip-date");
   return args;
 }
-export async function runAnamnesisQuery(roomDir, roomName, options = {}) {
+
+function validateAmbientRoom(roomDir, roomName) {
   const effectiveRoomDir = path.resolve(String(roomDir || process.cwd()));
+  const roomFromPath = normalizeRoomName(path.basename(effectiveRoomDir));
   const requestedRoom = roomName === undefined || roomName === null
     ? path.basename(effectiveRoomDir)
     : roomName;
   const resolvedRoom = normalizeRoomName(requestedRoom);
+
+  if (!roomFromPath) {
+    return {
+      ok: false,
+      effectiveRoomDir,
+      requestedRoom,
+      error: `unknown room path: ${path.basename(effectiveRoomDir)}`,
+    };
+  }
+  if (!resolvedRoom) {
+    return {
+      ok: false,
+      effectiveRoomDir,
+      requestedRoom,
+      error: `unknown room: ${String(requestedRoom)}`,
+    };
+  }
+  if (roomFromPath !== resolvedRoom) {
+    return {
+      ok: false,
+      effectiveRoomDir,
+      requestedRoom,
+      error: `room name/path mismatch: ${resolvedRoom} != ${roomFromPath}`,
+    };
+  }
+
+  return { ok: true, effectiveRoomDir, requestedRoom, resolvedRoom };
+}
+
+export async function runAnamnesisQuery(roomDir, roomName, options = {}) {
+  const ambient = validateAmbientRoom(roomDir, roomName);
+  const effectiveRoomDir = ambient.effectiveRoomDir;
+  const resolvedRoom = ambient.resolvedRoom;
   const requestedMode = options?.mode;
   const mode = requestedMode === "consult" ? "consult" : requestedMode === "wake" || requestedMode == null ? "wake" : String(requestedMode);
   if (mode !== "wake" && mode !== "consult") {
     return { ok: false, mode, entries: [], warnings: [`invalid anamnesis mode: ${mode}`] };
   }
   const warnings = [];
-  if (!resolvedRoom) {
-    return { ok: false, mode, entries: [], warnings: [`unknown room: ${String(requestedRoom)}`] };
+  if (!ambient.ok) {
+    return { ok: false, mode, entries: [], warnings: [ambient.error] };
   }
   const limitValue = Number(options?.limit);
   const limit = Number.isFinite(limitValue) ? Math.max(1, Math.min(50, Math.floor(limitValue))) : undefined;
@@ -786,14 +821,12 @@ export async function runAnamnesisQuery(roomDir, roomName, options = {}) {
 }
 
 export async function runRecallQuery(roomDir, roomName, query) {
-  const effectiveRoomDir = path.resolve(String(roomDir || process.cwd()));
-  const requestedRoom = roomName === undefined || roomName === null
-    ? path.basename(effectiveRoomDir)
-    : roomName;
-  const resolvedRoom = normalizeRoomName(requestedRoom);
+  const ambient = validateAmbientRoom(roomDir, roomName);
+  const effectiveRoomDir = ambient.effectiveRoomDir;
+  const resolvedRoom = ambient.resolvedRoom;
 
-  if (!resolvedRoom) {
-    return { ok: false, error: `unknown room: ${String(requestedRoom)}`, query };
+  if (!ambient.ok) {
+    return { ok: false, error: ambient.error, query };
   }
 
   if (!query || !String(query).trim()) {

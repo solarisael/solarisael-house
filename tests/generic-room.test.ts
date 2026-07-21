@@ -87,6 +87,17 @@ describe("generic room keys", () => {
     expect(observedPostgresArgv[roomIndex + 1]).toBe("aurora-lab");
   });
 
+  test("preserves explicit cross-room memory handles", async () => {
+    const { runRecallQuery } = await import("../src/memory.ts");
+    observedPostgresArgv = null;
+    const result = await runRecallQuery("/tmp/aurora-lab", "aurora-lab", "memory://other-room/42");
+    expect(result.ok).toBe(true);
+    expect(observedPostgresArgv).toContain("--mode");
+    expect(observedPostgresArgv[observedPostgresArgv.indexOf("--mode") + 1]).toBe("fetch");
+    const roomIndex = observedPostgresArgv.indexOf("--room");
+    expect(observedPostgresArgv[roomIndex + 1]).toBe("other-room");
+  });
+
   test("nudges arbitrary valid rooms with neutral context defaults", () => {
     const decision = computeContextNudge({
       room: "aurora-lab",

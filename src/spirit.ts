@@ -115,6 +115,7 @@ export async function writeActiveSpiritFiles({
   activeSpirit, agentName, state,
   effectiveRoomDir, roomCoercedSpirit, roomDir,
 }) {
+  const spirit = await loadSpiritContract(activeSpirit);
   // Compatibility mapping for persisted legacy room headers. New rooms use
   // their requested spirit/mode label without this translation.
   const legacyHeader = {

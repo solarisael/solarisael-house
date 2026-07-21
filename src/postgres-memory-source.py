@@ -433,6 +433,7 @@ def load_search_candidates(
     excerpt_chars: int = DEFAULT_CANDIDATE_EXCERPT_CHARS,
     erasure_columns: dict[str, bool] | None = None,
     include_archived: bool = False,
+    lesson_scopes: tuple | None = None,
 ) -> tuple[list[str], list[dict]]:
     """Return normalized lightweight retrieval candidates.
 
@@ -453,6 +454,9 @@ def load_search_candidates(
     memory_filter = erasure_filter(
         erasure_columns, include_archived=include_archived,
     )
+    lesson_scope_list = sorted({
+        str(scope).strip() for scope in (lesson_scopes or ("shared",)) if str(scope).strip()
+    })
 
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute(
@@ -613,20 +617,26 @@ def load_search_candidates(
                    ts_rank_cd(lesson_tsv, q.query, 32) AS raw_rank,
                    title ILIKE ANY(%s::text[]) AS title_hit
             FROM coding_lessons, q
-            WHERE lesson_tsv @@ q.query
-               OR title ILIKE ANY(%s::text[])
-               OR shape ILIKE ANY(%s::text[])
-               OR project ILIKE ANY(%s::text[])
-               OR scope ILIKE ANY(%s::text[])
+            WHERE scope = ANY(%s)
+              AND (
+                lesson_tsv @@ q.query
+                OR title ILIKE ANY(%s::text[])
+                OR shape ILIKE ANY(%s::text[])
+                OR project ILIKE ANY(%s::text[])
+                OR scope ILIKE ANY(%s::text[])
+              )
             ORDER BY raw_rank DESC, updated_at DESC, id DESC
             LIMIT %s
             """,
             (
-                text_query, term_patterns, term_patterns, term_patterns,
-                term_patterns, term_patterns, top_k,
+                text_query, term_patterns, lesson_scope_list, term_patterns,
+                term_patterns, term_patterns, term_patterns, top_k,
             ),
         )
         for row in cur.fetchall():
+            lesson_scope = str(row["scope"] or "shared").strip()
+            if lesson_scope not in lesson_scope_list:
+                continue
             item = _candidate(
                 source="coding_lesson",
                 source_table="coding_lessons",
@@ -642,38 +652,6 @@ def load_search_candidates(
                     f"{row['shape'] or ''} {' '.join(row['tags'] or [])}"
                 ),
                 reasons=["coding lesson", "lesson/title/shape/tag search"],
-            )
-            if item:
-                candidates.append(item)
-
-        cur.execute(
-            """
-            WITH q AS (SELECT websearch_to_tsquery('english', %s) AS query)
-            SELECT id, project, title, lesson, tags,
-                   ts_rank_cd(lesson_tsv, q.query, 32) AS raw_rank,
-                   title ILIKE ANY(%s::text[]) AS title_hit
-            FROM project_lessons, q
-            WHERE lesson_tsv @@ q.query
-               OR title ILIKE ANY(%s::text[])
-               OR project ILIKE ANY(%s::text[])
-            ORDER BY raw_rank DESC, updated_at DESC, id DESC
-            LIMIT %s
-            """,
-            (text_query, term_patterns, term_patterns, term_patterns, top_k),
-        )
-        for row in cur.fetchall():
-            item = _candidate(
-                source="project_lesson",
-                source_table="project_lessons",
-                source_id=int(row["id"]),
-                room="",
-                title=row["title"] or "",
-                excerpt=row["lesson"] or "",
-                terms=terms,
-                raw_rank=float(row["raw_rank"] or 0.0),
-                title_hit=bool(row["title_hit"]),
-                extra_haystack=f"{row['project'] or ''} {' '.join(row['tags'] or [])}",
-                reasons=["project lesson", "lesson/title/project search"],
             )
             if item:
                 candidates.append(item)
@@ -916,6 +894,7 @@ def load_cluster_resonance(
     top_clusters=8,
     hot_per_cluster=2,
     exclude_paths=None,
+    rooms: tuple | None = None,
     erasure_columns: dict[str, bool] | None = None,
     include_archived: bool = False,
 ):
@@ -935,16 +914,24 @@ def load_cluster_resonance(
     memory_filter = erasure_filter(
         erasure_columns, include_archived=include_archived,
     )
+    room_list = sorted({str(room).strip() for room in (rooms or ("house",)) if str(room).strip()})
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute(
-            """
-            SELECT id, label, member_count,
-                   1 - (centroid <=> %s::halfvec) AS activation
-            FROM memory_clusters
-            WHERE centroid IS NOT NULL
+            f"""
+            SELECT mc.id, mc.label, COUNT(DISTINCT mm.chunk_id) AS member_count,
+                   1 - (mc.centroid <=> %s::halfvec) AS activation
+            FROM memory_clusters mc
+            JOIN memory_cluster_members mm ON mm.cluster_id = mc.id
+            JOIN memory_chunks c ON c.id = mm.chunk_id
+            JOIN memories m ON m.id = c.memory_id
+            WHERE mc.centroid IS NOT NULL
+              AND m.room = ANY(%s)
+              AND {RETRIEVAL_VISIBILITY_SQL}
+              AND {memory_filter}
+            GROUP BY mc.id, mc.label, mc.centroid
             ORDER BY activation DESC
             """,
-            (literal,),
+            (literal, room_list),
         )
         rows = cur.fetchall()
         profile = [
@@ -966,12 +953,13 @@ def load_cluster_resonance(
                 JOIN memory_chunks c ON c.id = mm.chunk_id
                 JOIN memories m ON m.id = c.memory_id
                 WHERE mm.cluster_id = %s
+                  AND m.room = ANY(%s)
                   AND {RETRIEVAL_VISIBILITY_SQL}
                   AND {memory_filter}
                 ORDER BY sim DESC
                 LIMIT %s
                 """,
-                (literal, entry["cluster_id"], hot_per_cluster + 4),
+                (literal, entry["cluster_id"], room_list, hot_per_cluster + 4),
             )
             picked = []
             for r in cur.fetchall():
@@ -1783,6 +1771,7 @@ def main() -> int:
                         excerpt_chars=args.candidate_excerpt_chars,
                         erasure_columns=erasure_columns,
                         include_archived=include_archived,
+                        lesson_scopes=("shared", room_name),
                     )
                 except Exception as err:
                     print(f"candidates: query failed: {err}", file=sys.stderr)
@@ -1857,6 +1846,7 @@ def main() -> int:
                             conn,
                             query_vec=vec,
                             exclude_paths={c.get("source_path") for c in chunks},
+                            rooms=(room_name, "house"),
                             erasure_columns=erasure_columns,
                             include_archived=include_archived,
                         )

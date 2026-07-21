@@ -8,7 +8,7 @@ import {
   loadMemoryLexicalSources,
   loadMemorySemanticSource,
 } from "../src/memory-sources.ts";
-import { injectRoomMemoryContext, runRecallQuery } from "../src/memory.ts";
+import { injectRoomMemoryContext, runAnamnesisQuery, runRecallQuery } from "../src/memory.ts";
 
 const ENV_KEYS = [
   "SOLARISAEL_MEMORY_SOURCE",
@@ -281,4 +281,30 @@ describe("forced JSON memory orchestration", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+  test("runRecallQuery fails closed when room name and path disagree", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "solarisael-room-mismatch-"));
+    const roomDir = path.join(root, "alpha-room");
+    await mkdir(roomDir, { recursive: true });
+    try {
+      const result = await runRecallQuery(roomDir, "beta-room", "blue hinge");
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("room name/path mismatch");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("runAnamnesisQuery fails closed when room name and path disagree", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "solarisael-room-mismatch-"));
+    const roomDir = path.join(root, "alpha-room");
+    await mkdir(roomDir, { recursive: true });
+    try {
+      const result = await runAnamnesisQuery(roomDir, "beta-room");
+      expect(result.ok).toBe(false);
+      expect(result.warnings).toEqual([expect.stringContaining("room name/path mismatch")]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
 });

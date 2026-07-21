@@ -27,7 +27,7 @@ def row(i, scope="shared", project="", shape="process", tags=None, trigger=""):
 
 class LessonContextTests(unittest.TestCase):
     def test_ranking_precedence_and_scope(self):
-        conn = Conn([row(2, trigger="deploy"), row(1, tags=["deploy"]), row(3, shape="deploy")], [])
+        conn = Conn([row(9, scope="other-room"), row(2, trigger="deploy"), row(1, tags=["deploy"]), row(3, shape="deploy")], [])
         result = lesson_context.retrieve_lesson_context(conn, "sample-room", shapes=["deploy"], terms=["deploy"], limit=3)
         self.assertEqual([x["id"] for x in result["codingLessons"]], [2, 1, 3])
         self.assertEqual(result["match"]["scopes"], ["shared", "sample-room"])
@@ -39,6 +39,11 @@ class LessonContextTests(unittest.TestCase):
         self.assertEqual([x["id"] for x in result["projectLessons"]], [4])
         self.assertEqual([x["id"] for x in result["codingLessons"]], [1])
         self.assertEqual(conn.cursor_obj.calls[1][1], (["app"],))
+
+    def test_project_lessons_are_filtered_to_explicit_project_contract(self):
+        conn = Conn([row(1)], [row(4, project="app"), row(5, project="other")])
+        result = lesson_context.retrieve_lesson_context(conn, "sample-room", projects=["app"], limit=10)
+        self.assertEqual([x["id"] for x in result["projectLessons"]], [4])
 
     def test_unavailable_substrate_fails_open(self):
         import io
