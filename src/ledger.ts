@@ -11,12 +11,12 @@
 import { appendFile, mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  CONTINUITY_ROOT, DEFAULT_AGENT_NAME, DEFAULT_SPIRIT,
+  CONTINUITY_ROOT, DEFAULT_AGENT_NAME, DEFAULT_OPERATOR, DEFAULT_SPIRIT,
   LEDGER_ROOT,
   LIVE_CONTEXT_FILENAME, LIVE_CONTEXT_JSON_FILENAME, LIVE_CONTEXT_MAX_TURNS,
 } from "./paths.ts";
 import { localDateStamp, readJson, readJsonl, writeJson } from "./util.ts";
-import { resolveEffectiveRoomDir, resolveSharedRoot } from "./spirit.ts";
+import { normalizeRoomName, resolveEffectiveRoomDir, resolveSharedRoot } from "./spirit.ts";
 
 // ── conversation ledger ────────────────────────────────────────────────────
 
@@ -112,12 +112,11 @@ async function appendConversationLedger(entry) {
 
 // ── live room context ──────────────────────────────────────────────────────
 
-async function resolveLiveContextTargets(roomDir = process.cwd()) {
+export async function resolveLiveContextTargets(roomDir = process.cwd()) {
   const effectiveRoomDir = resolveEffectiveRoomDir(roomDir);
   const effectiveSharedRoot = resolveSharedRoot(effectiveRoomDir);
-  const roomName = path.basename(effectiveRoomDir);
-  const normalized = roomName.toLowerCase();
-  if (normalized !== "kodo" && normalized !== "kintsu") return null;
+  const roomName = normalizeRoomName(path.basename(effectiveRoomDir));
+  if (!roomName) return null;
 
   try {
     await stat(path.join(effectiveSharedRoot, "shared_current_state.md"));
@@ -185,7 +184,7 @@ function formatLiveContextMarkdown(state) {
     `- Updated: ${state.updatedAt || "unknown"}`,
     `- Agent: ${state.agentName || DEFAULT_AGENT_NAME}`,
     `- Active spirit: ${state.spirit || DEFAULT_SPIRIT}`,
-    `- Operator: ${state.operator || "Sol"}`,
+    `- Operator: ${state.operator || DEFAULT_OPERATOR}`,
     "",
     "## Latest User Turn",
     "",
@@ -238,7 +237,7 @@ async function refreshLiveRoomContext(entry, paths = {}) {
     sessionID: entry?.sessionID || null,
     updatedAt: nextTurn.timestamp,
     agentName: entry?.agentName || DEFAULT_AGENT_NAME,
-    operator: entry?.operator || "Sol",
+    operator: entry?.operator || DEFAULT_OPERATOR,
     spirit: entry?.spirit || DEFAULT_SPIRIT,
     recentTurns,
     latestUser: entry?.role === "user" ? nextTurn.text : base.latestUser || "",
@@ -267,7 +266,7 @@ export async function logUserTurn(
     sessionID, messageID,
     role: "user",
     spirit: spirit || DEFAULT_SPIRIT,
-    operator: operator || "Sol",
+    operator: operator || DEFAULT_OPERATOR,
     agentName: agentName || DEFAULT_AGENT_NAME,
     text,
   };
@@ -289,7 +288,7 @@ export async function logAssistantTurn(
     sessionID, messageID,
     role: "assistant",
     spirit: resolvedSpirit,
-    operator: operator || "Sol",
+    operator: operator || DEFAULT_OPERATOR,
     agentName: agentName || DEFAULT_AGENT_NAME,
     text,
   };

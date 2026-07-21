@@ -13,6 +13,7 @@ import {
   MEMORY_POSTGRES_SOURCE_SCRIPT, MEMORY_POSTGRES_TIMEOUT_MS,
   MEMORY_SEMANTIC_MIN_SIM, MEMORY_SEMANTIC_TOP_K,
 } from "./paths.ts";
+import { normalizeRoomName } from "./spirit.ts";
 import { readJson } from "./util.ts";
 import { runWsl, windowsPathToWsl } from "./wsl.ts";
 
@@ -46,30 +47,42 @@ export async function spawnPostgresSource(roomDir, args, prompt) {
   }
 }
 
+function resolvePostgresRoom(roomDir, roomName) {
+  const candidate = roomName === undefined || roomName === null
+    ? path.basename(roomDir || "")
+    : roomName;
+  return normalizeRoomName(candidate);
+}
+
+function invalidPostgresRoom(roomDir, roomName) {
+  const candidate = roomName === undefined || roomName === null
+    ? path.basename(roomDir || "")
+    : String(roomName);
+  return Promise.resolve({ ok: false, error: `invalid room key: ${candidate}` });
+}
+
 function runMemoryPostgresLexical(roomDir, roomName, prompt) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
+  const resolvedRoom = resolvePostgresRoom(roomDir, roomName);
+  if (!resolvedRoom) return invalidPostgresRoom(roomDir, roomName);
   const args = [
     "--room-dir", windowsPathToWsl(roomDir),
+    "--room", resolvedRoom,
     "--mode", "lexical",
   ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
 
   return spawnPostgresSource(roomDir, args, prompt);
 }
 
 function runMemoryPostgresSemantic(roomDir, roomName, prompt, scopeFiles) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
+  const resolvedRoom = resolvePostgresRoom(roomDir, roomName);
+  if (!resolvedRoom) return invalidPostgresRoom(roomDir, roomName);
   const args = [
     "--room-dir", windowsPathToWsl(roomDir),
+    "--room", resolvedRoom,
     "--mode", "semantic",
     "--semantic-top-k", String(MEMORY_SEMANTIC_TOP_K),
     "--semantic-min-sim", String(MEMORY_SEMANTIC_MIN_SIM),
   ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
   if (Array.isArray(scopeFiles) && scopeFiles.length) {
     args.push("--scope-files", scopeFiles.join(","));
   }
@@ -82,14 +95,13 @@ function runMemoryPostgresSemantic(roomDir, roomName, prompt, scopeFiles) {
 // literally named a date and this returns memories tagged with it. No
 // embed, no scope-narrowing, cheap due to the GIN index.
 function runMemoryPostgresDate(roomDir, roomName, prompt) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
+  const resolvedRoom = resolvePostgresRoom(roomDir, roomName);
+  if (!resolvedRoom) return invalidPostgresRoom(roomDir, roomName);
   const args = [
     "--room-dir", windowsPathToWsl(roomDir),
+    "--room", resolvedRoom,
     "--mode", "date",
   ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
 
   return spawnPostgresSource(roomDir, args, prompt);
 }
@@ -100,16 +112,15 @@ function runMemoryPostgresDate(roomDir, roomName, prompt) {
 // caller explicitly wants narrowing (matches semantic-pass behavior for
 // back-compat).
 function runMemoryPostgresContent(roomDir, roomName, prompt, scopeFiles) {
-  const resolvedRoom = (roomName || path.basename(roomDir) || "").toLowerCase();
+  const resolvedRoom = resolvePostgresRoom(roomDir, roomName);
+  if (!resolvedRoom) return invalidPostgresRoom(roomDir, roomName);
   const args = [
     "--room-dir", windowsPathToWsl(roomDir),
+    "--room", resolvedRoom,
     "--mode", "content",
     "--content-top-k", String(MEMORY_CONTENT_TOP_K),
     "--content-min-sim", String(MEMORY_CONTENT_MIN_SIM),
   ];
-  if (resolvedRoom === "kodo" || resolvedRoom === "kintsu") {
-    args.push("--room", resolvedRoom);
-  }
   if (Array.isArray(scopeFiles) && scopeFiles.length) {
     args.push("--scope-files", scopeFiles.join(","));
   }

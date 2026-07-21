@@ -464,12 +464,16 @@ function messageHasMemoryContext(message) {
 }
 
 function stripEmbeddedMemoryContext(text) {
+  const roomHeader = String.raw`[a-z0-9]+(?:-[a-z0-9]+)*`;
   return String(text || "")
     .replace(
-      /<system-reminder>[\s\S]*?(?:Kintsu|Kodo|Tuner) Memory Retrieval[\s\S]*?<\/system-reminder>/gi,
+      new RegExp(`<system-reminder>[\\s\\S]*?${roomHeader} Memory Retrieval[\\s\\S]*?<\\/system-reminder>`, "gi"),
       "",
     )
-    .replace(/^## (?:Kintsu|Kodo|Tuner) Memory Retrieval - auto-loaded context[\s\S]*$/gim, "")
+    .replace(
+      new RegExp(`^## ${roomHeader} Memory Retrieval - auto-loaded context[\\s\\S]*$`, "gim"),
+      "",
+    )
     .trim();
 }
 
@@ -493,15 +497,14 @@ function userPromptFromMessage(message) {
 
 async function runRoomMemoryRetrieval(roomName, roomDir, prompt, sessionID = null) {
   const effectiveRoomDir = path.resolve(String(roomDir || process.cwd()));
-  const baseName = path.basename(effectiveRoomDir).toLowerCase();
-  const targetRoom = (roomName || baseName || "").toLowerCase();
+  const baseName = path.basename(effectiveRoomDir);
+  const baseRoom = normalizeRoomName(baseName);
+  const targetRoom = normalizeRoomName(roomName || baseName);
 
   // Sanity: only fire when cwd basename matches the requested room.
   // Prevents cross-room retrieval if caller and resolved dir disagree.
   const empty = { contextBlock: "", canonBlock: "" };
-  if (!targetRoom || baseName !== targetRoom) return empty;
-
-  if (String(prompt || "").trim().length < MEMORY_MIN_PROMPT_LEN) return empty;
+  if (!targetRoom || baseRoom !== targetRoom) return empty;
 
   try {
     const statePath = path.join(effectiveRoomDir, MEMORY_STATE_FILENAME);
@@ -744,19 +747,20 @@ export function recallRouteSkipArgs(queryRoute) {
   if (!lanes.date) args.push("--skip-date");
   return args;
 }
-
-
 export async function runAnamnesisQuery(roomDir, roomName, options = {}) {
   const effectiveRoomDir = path.resolve(String(roomDir || process.cwd()));
-  const resolvedRoom = String(roomName || path.basename(effectiveRoomDir) || "").toLowerCase();
+  const requestedRoom = roomName === undefined || roomName === null
+    ? path.basename(effectiveRoomDir)
+    : roomName;
+  const resolvedRoom = normalizeRoomName(requestedRoom);
   const requestedMode = options?.mode;
   const mode = requestedMode === "consult" ? "consult" : requestedMode === "wake" || requestedMode == null ? "wake" : String(requestedMode);
   if (mode !== "wake" && mode !== "consult") {
     return { ok: false, mode, entries: [], warnings: [`invalid anamnesis mode: ${mode}`] };
   }
   const warnings = [];
-  if (!normalizeRoomName(resolvedRoom)) {
-    return { ok: false, mode, entries: [], warnings: [`unknown room: ${resolvedRoom}`] };
+  if (!resolvedRoom) {
+    return { ok: false, mode, entries: [], warnings: [`unknown room: ${String(requestedRoom)}`] };
   }
   const limitValue = Number(options?.limit);
   const limit = Number.isFinite(limitValue) ? Math.max(1, Math.min(50, Math.floor(limitValue))) : undefined;
@@ -782,25 +786,29 @@ export async function runAnamnesisQuery(roomDir, roomName, options = {}) {
     warnings: [...warnings, ...(Array.isArray(data.warnings) ? data.warnings : [])],
   };
 }
+
 export async function runRecallQuery(roomDir, roomName, query) {
   const effectiveRoomDir = path.resolve(String(roomDir || process.cwd()));
-  const resolvedRoom = (roomName || path.basename(effectiveRoomDir) || "").toLowerCase();
+  const requestedRoom = roomName === undefined || roomName === null
+    ? path.basename(effectiveRoomDir)
+    : roomName;
+  const resolvedRoom = normalizeRoomName(requestedRoom);
 
-  if (!normalizeRoomName(resolvedRoom)) {
-    return { ok: false, error: `unknown room: ${resolvedRoom}`, query };
+  if (!resolvedRoom) {
+    return { ok: false, error: `unknown room: ${String(requestedRoom)}`, query };
   }
 
   if (!query || !String(query).trim()) {
     return { ok: false, error: "empty query", query };
   }
 
-  // memory://<room>/<id-or-source-path> — deliberate house-wide handle
-  // (2026-07-09 decency architecture: ambient search stays room-scoped so
-  // each room keeps its personality; explicit handles cross rooms on
-  // purpose, provenance stamped by the fetch payload).
-  const handleMatch = /^\s*memory:\/\/([a-z0-9_.-]+)\/(.+?)\s*$/i.exec(String(query));
+  // memory://<room>/<id-or-source-path> — deliberate house-wide handle.
+  const handleMatch = /^\s*memory:\/\/([a-z0-9]+(?:-[a-z0-9]+)*)\/(.+?)\s*$/.exec(String(query));
   if (handleMatch) {
-    const claimedRoom = handleMatch[1].toLowerCase();
+    const claimedRoom = normalizeRoomName(handleMatch[1]);
+    if (!claimedRoom) {
+      return { ok: false, error: `unknown room: ${handleMatch[1]}`, query };
+    }
     const rest = handleMatch[2].trim();
     const fetchArgs = [
       "--room-dir", windowsPathToWsl(effectiveRoomDir),
@@ -1015,8 +1023,8 @@ export async function injectRoomMemoryContext(output, paths = {}) {
   // resolveEffectiveRoomDir no longer takes state hints (cwd authority).
   await loadState(sessionID);
   const effectiveRoomDir = resolveEffectiveRoomDir(paths.roomDir);
-  const roomBaseName = path.basename(effectiveRoomDir).toLowerCase();
-  if (!normalizeRoomName(roomBaseName)) return;
+  const roomBaseName = normalizeRoomName(path.basename(effectiveRoomDir));
+  if (!roomBaseName) return;
 
   const prompt = userPromptFromMessage(message);
   const { contextBlock, canonBlock } = await runRoomMemoryRetrieval(

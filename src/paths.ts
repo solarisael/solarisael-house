@@ -22,9 +22,12 @@ export const CONTINUITY_ROOT = path.join(OPERATOR_DIR, "continuity", "spirits");
 export const SPIRIT_DIR = path.join(HOME, ".config", "opencode", "spirits");
 export const SPIRIT_CONTRACT_OUTPUT = path.join(OPERATOR_DIR, "active_spirit.md");
 
-export const DEFAULT_SPIRIT = "Kintsu";
-export const DEFAULT_AGENT_NAME = "Kintsu";
-export const SUPPORTED_SPIRITS = ["Kintsu", "Kodo", "Tuner"];
+export const DEFAULT_ROOM = "default-room";
+export const DEFAULT_SPIRIT = "Spirit";
+export const DEFAULT_AGENT_NAME = "Spirit";
+export const DEFAULT_OPERATOR = "Operator";
+export const ROOM_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const LEGACY_ROOM_KEYS = ["kintsu", "kodo", "tuner"];
 
 export const LIVE_CONTEXT_FILENAME = "current_session_context.md";
 export const LIVE_CONTEXT_JSON_FILENAME = "current_session_context.json";

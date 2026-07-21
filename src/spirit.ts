@@ -11,13 +11,22 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  DEFAULT_AGENT_NAME, DEFAULT_SPIRIT,
+  DEFAULT_AGENT_NAME, DEFAULT_OPERATOR, DEFAULT_SPIRIT,
+  LEGACY_ROOM_KEYS, ROOM_KEY_PATTERN,
   RUNTIME_DIR, SPIRIT_CONTRACT_OUTPUT, SPIRIT_DIR,
-  SUPPORTED_SPIRITS,
 } from "./paths.ts";
-import { normalizeForMatch, readOptionalText } from "./util.ts";
+import { readOptionalText } from "./util.ts";
 
 const spiritCache = new Map();
+const legacyRoomKeys = new Set(LEGACY_ROOM_KEYS);
+
+function safeIdentityName(value) {
+  const candidate = String(value ?? "");
+  if (!candidate || candidate === "." || candidate === "..") return null;
+  if (candidate.includes("/") || candidate.includes("\\") || candidate.includes("\0")) return null;
+  return candidate;
+}
+
 
 export function resolveRoomDir(pluginInput) {
   const candidate = pluginInput?.worktree || pluginInput?.directory || process.cwd();
@@ -28,29 +37,25 @@ export function resolveSharedRoot(roomDir) {
   return path.dirname(roomDir || process.cwd());
 }
 
-export function normalizeRoomName(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return SUPPORTED_SPIRITS.some((s) => s.toLowerCase() === normalized) ? normalized : null;
+export function isValidRoomKey(value) {
+  return typeof value === "string" && ROOM_KEY_PATTERN.test(value);
 }
 
-function normalizeSupportedSpirit(value) {
-  const normalized = normalizeForMatch(value);
-  return SUPPORTED_SPIRITS.find((spirit) => normalizeForMatch(spirit) === normalized) || null;
+export function normalizeRoomName(value) {
+  if (typeof value !== "string" || !value) return null;
+  const normalized = value.toLowerCase();
+  if (isValidRoomKey(value)) return value;
+  // Existing persisted markers used title-cased legacy room names.
+  return legacyRoomKeys.has(normalized) ? normalized : null;
 }
 
 export function normalizeAgentName(value) {
-  return normalizeSupportedSpirit(value) || DEFAULT_AGENT_NAME;
+  return safeIdentityName(value) || DEFAULT_AGENT_NAME;
 }
 
 export async function normalizeSpirit(value) {
-  const requested = String(value || "").trim();
-  if (!requested) return null;
-
-  const exact = SUPPORTED_SPIRITS.find((mode) => mode === requested);
-  if (exact) return exact;
-
-  const target = normalizeForMatch(requested);
-  return SUPPORTED_SPIRITS.find((mode) => normalizeForMatch(mode) === target) || null;
+  const requested = safeIdentityName(value);
+  return requested || null;
 }
 
 // Walk UP from a directory looking for a kodo/kintsu ancestor. Bounded
@@ -91,12 +96,10 @@ export function resolveEffectiveRoomDir(roomDir) {
   return base;
 }
 
-// If the effective room dir basename is "kodo" or "kintsu", return the
-// canonical capitalized spirit name. Otherwise null (caller should fall
-// back to state-resolved spirit and refuse to write the global file).
+// Return the validated room key for the effective directory. Legacy room
+// markers remain accepted, but custom rooms are never mapped to a spirit.
 export function coerceRoomSpirit(effectiveRoomDir) {
-  const baseName = path.basename(effectiveRoomDir).toLowerCase();
-  return SUPPORTED_SPIRITS.find((s) => s.toLowerCase() === baseName) || null;
+  return normalizeRoomName(path.basename(effectiveRoomDir));
 }
 
 // Load the spirit contract markdown for a given mode. mtime-cached.
@@ -142,10 +145,15 @@ export async function writeActiveSpiritFiles({
   effectiveRoomDir, roomCoercedSpirit, roomDir,
 }) {
   const spirit = await loadSpiritContract(activeSpirit);
-  const headerSpirit = roomCoercedSpirit || activeSpirit || spirit.mode || DEFAULT_SPIRIT;
+  const legacyHeader = {
+    kodo: "Kodo",
+    kintsu: "Kintsu",
+    tuner: "Tuner",
+  }[roomCoercedSpirit] || null;
+  const headerSpirit = legacyHeader || activeSpirit || spirit.mode || DEFAULT_SPIRIT;
   const spiritOutput = [
     `# Active Spirit: ${headerSpirit}`,
-    `Agent: ${agentName} | Operator: ${state.operator || "Sol"}`,
+    `Agent: ${agentName || DEFAULT_AGENT_NAME} | Operator: ${state.operator || DEFAULT_OPERATOR}`,
     `Embodied: ${state.embodiedSpirit || DEFAULT_SPIRIT} | Conjured: ${state.conjuredSpirit || "none"} | Summoned: ${state.summonedSpirit || "none"}`,
     "",
     spirit.markdown,
