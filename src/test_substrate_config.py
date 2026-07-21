@@ -27,6 +27,10 @@ class SubstrateConfigTests(unittest.TestCase):
     def test_default_resolves_sibling_substrate(self):
         self.assertEqual(resolve_substrate_dir(self.room_dir), self.default_dir.resolve())
 
+    def test_blank_environment_override_uses_sibling_default(self):
+        with patch.dict(os.environ, {"SOLARISAEL_SUBSTRATE": "  "}):
+            self.assertEqual(resolve_substrate_dir(self.room_dir), self.default_dir.resolve())
+
     def test_environment_override_wins_over_default(self):
         override = self.root / "isolated-substrate"
         override.mkdir()

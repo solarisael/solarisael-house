@@ -17,9 +17,8 @@ from substrate_config import substrate_env
 try:
     import psycopg2
     import psycopg2.extras
-except Exception as exc:  # pragma: no cover - exercised by CLI environments
-    print(json.dumps({"ok": False, "error": f"psycopg2 import failed: {exc}"}))
-    raise SystemExit(0)
+except ImportError:
+    psycopg2 = None
 
 
 TABLES = {"coding-lesson": "coding_lessons", "project-lesson": "project_lessons"}
@@ -62,6 +61,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         env = substrate_env(args.room_dir)
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 is required for lesson deletion")
         conn = psycopg2.connect(host=env.get("PGHOST"), port=env.get("PGPORT"), user=env.get("PGUSER"), password=env.get("PGPASSWORD"), dbname=env.get("PGDATABASE"), connect_timeout=2)
         try:
             result = delete_lesson(conn, args.kind, args.id, args.expected_title)

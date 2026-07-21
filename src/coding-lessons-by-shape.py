@@ -21,9 +21,8 @@ from substrate_config import substrate_env
 try:
     import psycopg2
     import psycopg2.extras
-except Exception as e:
-    print(json.dumps({"lessons": [], "error": f"psycopg2 import failed: {e}"}))
-    sys.exit(0)
+except ImportError:
+    psycopg2 = None
 
 
 
@@ -101,6 +100,8 @@ def main() -> int:
         if room_scope and room_scope != "shared":
             scopes.append(room_scope)
 
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 is required for coding lesson retrieval")
         conn = psycopg2.connect(
             host=env.get("PGHOST"),
             port=env.get("PGPORT"),

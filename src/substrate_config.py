@@ -78,8 +78,10 @@ def resolve_substrate_dir(
     configured = substrate_dir
     source = "--substrate-dir"
     if configured is None and "SOLARISAEL_SUBSTRATE" in env:
-        configured = env["SOLARISAEL_SUBSTRATE"]
-        source = "SOLARISAEL_SUBSTRATE"
+        candidate = os.fspath(env["SOLARISAEL_SUBSTRATE"]).strip()
+        if candidate:
+            configured = candidate
+            source = "SOLARISAEL_SUBSTRATE"
 
     if configured is not None:
         raw = os.fspath(configured).strip()

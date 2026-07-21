@@ -52,8 +52,23 @@ from substrate_config import (
 # Windows default cp1252. The plugin spawns this on Windows, reads stdout JSON.
 sys.stdout.reconfigure(encoding="utf-8")
 
-import psycopg2
-import psycopg2.extras
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:
+    psycopg2 = None
+    psycopg2_extras = None
+
+
+ROOM_KEY_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def resolve_room_name(room: str | None, room_dir: Path) -> str:
+    """Resolve and validate the requested room without substituting another room."""
+    candidate = room if room is not None else room_dir.name
+    if not isinstance(candidate, str) or not ROOM_KEY_PATTERN.fullmatch(candidate):
+        raise ValueError(f"invalid room key: {candidate!r}")
+    return candidate
 
 
 # Semantic retrieval defaults. Override via CLI flags or env vars.
@@ -673,6 +688,8 @@ def load_search_candidates(
 
 
 def connect(env: dict[str, str]):
+    if psycopg2 is None:
+        raise RuntimeError("psycopg2 is required for PostgreSQL memory retrieval")
     return psycopg2.connect(
         host=env.get("PGHOST"),
         port=env.get("PGPORT"),
@@ -1539,7 +1556,7 @@ def main() -> int:
     parser.add_argument(
         "--room",
         default=None,
-        help="Room name (kodo|kintsu|test). If omitted, derived from --room-dir basename.",
+        help="Lowercase room key matching ^[a-z0-9]+(?:-[a-z0-9]+)*$. If omitted, derived from --room-dir basename.",
     )
     parser.add_argument(
         "--semantic-top-k",
@@ -1679,9 +1696,7 @@ def main() -> int:
     # Derive room name from cwd basename if not explicitly passed. Fixes the
     # 2026-05-04 bug where opencode-Kodo's session loaded Kintsu memory because
     # load_index/load_important_index defaulted to "kintsu" regardless of cwd.
-    room_name = (args.room or room_dir.name or "kodo").lower()
-    if room_name not in ("kodo", "kintsu", "tuner", "test"):
-        room_name = "kodo"  # safe fallback; both rooms have substrate rows
+    room_name = resolve_room_name(args.room, room_dir)
 
     prompt = read_prompt_from_stdin()
     scope_files: list[str] | None = None

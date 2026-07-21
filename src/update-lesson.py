@@ -17,9 +17,8 @@ from substrate_config import substrate_env
 try:
     import psycopg2
     import psycopg2.extras
-except Exception as exc:  # pragma: no cover - exercised by CLI environments
-    print(json.dumps({"ok": False, "error": f"psycopg2 import failed: {exc}"}))
-    raise SystemExit(0)
+except ImportError:
+    psycopg2 = None
 
 
 TABLES = {"coding-lesson": "coding_lessons", "project-lesson": "project_lessons"}
@@ -65,7 +64,8 @@ def update_lesson(conn, kind: str, lesson_id: int, expected_title: str, patch: d
 
     # The connection context commits on normal exit and rolls back on errors.
     with conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cursor_factory = psycopg2.extras.DictCursor if psycopg2 is not None else None
+        with conn.cursor(cursor_factory=cursor_factory) as cur:
             cur.execute(f"SELECT title FROM {table} WHERE id = %s FOR UPDATE", (lesson_id,))
             row = cur.fetchone()
             if row is None:
@@ -127,6 +127,8 @@ def main() -> int:
             lesson_id = args.id
         patch = _parse_patch(args)
         env = substrate_env(args.room_dir)
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 is required for lesson updates")
         conn = psycopg2.connect(host=env.get("PGHOST"), port=env.get("PGPORT"), user=env.get("PGUSER"), password=env.get("PGPASSWORD"), dbname=env.get("PGDATABASE"), connect_timeout=2)
         try:
             result = update_lesson(conn, args.kind, lesson_id, args.expected_title, patch)
