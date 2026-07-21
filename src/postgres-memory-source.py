@@ -706,7 +706,7 @@ def connect(env: dict[str, str]):
 
 def load_index(
     conn,
-    rooms=("kintsu", "house"),
+    rooms,
     erasure_columns: dict[str, bool] | None = None,
     include_archived: bool = False,
 ) -> dict:
@@ -779,7 +779,7 @@ def load_index(
         return {"files": files, "threads": threads}
 
 
-def load_important_index(conn, room="kintsu") -> dict:
+def load_important_index(conn, room) -> dict:
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         cur.execute(
             """
@@ -856,11 +856,11 @@ def load_cluster_staleness(
 def fetch_memory(conn, memory_id=None, source_path=None, claimed_room=None) -> dict:
     """Deliberate handle resolution: memory://<room>/<id-or-source-path>.
 
-    2026-07-09 decency architecture (Sol's ruling): ambient search stays
-    room-scoped so each room keeps its personality; explicit handles cross
-    rooms on purpose — a knock, not a key. Provenance is stamped so the
-    caller always knows whose memory it holds. Bypasses the db-only
-    visibility filter: following a receipt is deliberate, like a citation.
+    2026-07-09 retrieval architecture: ambient search stays room-scoped so
+    each room keeps its own context; explicit handles cross rooms on purpose —
+    a knock, not a key. Provenance is stamped so the caller always knows whose
+    memory it holds. Bypasses the db-only visibility filter: following a
+    receipt is deliberate, like a citation.
     """
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         if memory_id is not None:
@@ -993,8 +993,8 @@ def load_cluster_resonance(
 
 def load_taxonomy(
     conn,
-    rooms=("kintsu", "house"),
-    room="kintsu",
+    rooms,
+    room,
     limit=16,
     erasure_columns: dict[str, bool] | None = None,
     include_archived: bool = False,
@@ -1354,11 +1354,10 @@ def load_content_chunks(
 def extract_query_dates(query: str) -> list:
     """Pull validated date objects out of any YYYY-MM-DD tokens in the query.
 
-    Date-aware retrieval (added 2026-05-23). When the user/dragon asks about
+    Date-aware retrieval (added 2026-05-23). When the user or caller asks about
     a specific date — "what happened 2026-05-22", "show me yesterday's session
     (2026-05-22)", etc. — the prior 3-pass pipeline missed cross-midnight
     stitched files because `source_path` was never indexed for retrieval and
-    the body trigrams don't match raw ISO dates well. This extractor feeds
     the new `dateMatches` pass.
 
     Returns sorted unique date objects. Invalid date tokens (2026-13-45,
@@ -1697,9 +1696,9 @@ def main() -> int:
     args = parser.parse_args()
 
     room_dir = Path(windows_path_to_wsl(args.room_dir)).resolve()
-    # Derive room name from cwd basename if not explicitly passed. Fixes the
-    # 2026-05-04 bug where opencode-Kodo's session loaded Kintsu memory because
-    # load_index/load_important_index defaulted to "kintsu" regardless of cwd.
+    # Derive room name from cwd basename if not explicitly passed. The room
+    # directory is authoritative, preventing stale room defaults from selecting
+    # another room's memory.
     room_name = resolve_room_name(args.room, room_dir)
 
     prompt = read_prompt_from_stdin()
@@ -1892,9 +1891,8 @@ def main() -> int:
         # Date pass (added 2026-05-23 — date-aware retrieval fix). Extracts
         # YYYY-MM-DD tokens from the prompt and queries memories.dates (GIN
         # array). Direct authoritative match: no fuzz, no embedding, no
-        # threshold. Hits when the user/dragon literally names a date.
+        # threshold. Hits when the user or caller literally names a date.
         # mode=date runs ONLY this; mode=full includes it; lexical/semantic/
-        # content skip it.
         if args.mode in ("full", "date") and not args.skip_date:
             date_matches: list[dict] = []
             query_dates = extract_query_dates(prompt)

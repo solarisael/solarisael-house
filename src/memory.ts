@@ -17,10 +17,8 @@
 //
 // Fail-open: any pipeline error returns "" so the hook never blocks
 // message processing. Errors ALWAYS get logged (memory/retrieval_debug.log);
-// verbose per-turn diagnostics are env-gated on KINTSU_MEM_DEBUG=1. This
-// asymmetric gating is the 2026-05-12 lean-rewrite fix — previously every-
-// thing went through the env-gated debug logger, which meant errors
-// vanished silently when the env var was unset (and it was always unset).
+// verbose per-turn diagnostics are env-gated on SOLARISAEL_MEM_DEBUG=1.
+// Errors are always logged and never depend on the diagnostic flag.
 
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
@@ -66,13 +64,13 @@ async function appendMemoryDebug(roomDir, line) {
 }
 
 async function debugMemoryLog(roomDir, message) {
-  if (process.env.KINTSU_MEM_DEBUG !== "1") return;
+  if (process.env.SOLARISAEL_MEM_DEBUG !== "1") return;
   await appendMemoryDebug(roomDir, message);
 }
 
 async function errorMemoryLog(roomDir, err) {
-  // Always — even with KINTSU_MEM_DEBUG unset. Errors should never silently
-  // disappear; the May 12 bug-family root cause was exactly this shape.
+  // Always — even with SOLARISAEL_MEM_DEBUG unset. Errors should never silently
+  // disappear; this is intentionally independent of diagnostic gating.
   await appendMemoryDebug(roomDir, `ERROR ${err?.message || err}\n${err?.stack || ""}`);
 }
 
@@ -190,7 +188,7 @@ function collectMemorySemanticExcerpts(chunks) {
 
 // Date matches → excerpts. Added 2026-05-23 (date-aware retrieval fix).
 // Distinguished from all other excerpt types because date hits are
-// authoritative direct-match — when the user/dragon asks about a specific
+// authoritative direct-match — when the user or caller asks about a specific
 // YYYY-MM-DD that's tagged on the memory, this IS the memory they meant.
 // Surfaced HIGH (post-pinned, pre-important) so the context block leads
 // with the explicit answer instead of burying it under canon/threads.
@@ -716,7 +714,7 @@ async function runRoomMemoryRetrieval(roomName, roomDir, prompt, sessionID = nul
       canonBlock: formatCanonAssertionsBlock(canonAssertions, targetRoom),
     };
   } catch (err) {
-    // ALWAYS log — even with KINTSU_MEM_DEBUG unset. This is the May 12
+    // ALWAYS log — even with SOLARISAEL_MEM_DEBUG unset. This is the May 12
     // lean-rewrite fix: the previous broad-catch routed through the env-
     // gated debug logger, which silently swallowed exceptions in normal use.
     await errorMemoryLog(effectiveRoomDir, err);
@@ -725,18 +723,18 @@ async function runRoomMemoryRetrieval(roomName, roomDir, prompt, sessionID = nul
 }
 
 // ── recall tool query (2026-05-19 single-writer migration) ────────────────
-// Dragon-callable retrieval: same postgres source as pre-turn injection,
+// Caller-requested retrieval: same postgres source as pre-turn injection,
 // invoked from a tool inside the conversation, not auto-fired on user
-// prompts. Used when dragon notices its own uncertainty (name it can't
+// prompts. Used when the caller notices its own uncertainty (name it can't
 // trace, claim about to be made without verification, etc).
 //
 // Different posture than pre-turn:
-//   - the dragon framed the question itself — no need to rank threads
+//   - the caller framed the question itself — no need to rank threads
 //     against broad prompt; the query IS the focus
 //   - return everything matched with no recency-decay (canon-touching
-//     answers shouldn't be demoted for being old when *I* asked about
-//     them specifically)
-//   - higher top-K (8 vs 5) — the dragon is willing to read more chunks
+//     answers shouldn't be demoted for being old when the caller asked
+//     about them specifically)
+//   - higher top-K (8 vs 5) — the caller is willing to read more chunks
 //     when explicitly looking
 
 export function recallRouteSkipArgs(queryRoute) {
@@ -898,14 +896,14 @@ export async function runRecallQuery(roomDir, roomName, query) {
   // Returns {index, importantIndex, semanticChunks, contentChunks}.
   //
   // Recall-specific min-sim is tighter than pre-turn (0.50 vs 0.40). The
-  // dragon framed this query specifically and is going to *act* on what
+  // caller framed this query specifically and is going to *act* on what
   // comes back; weak matches should read as "not found" so the look-or-admit
   // discipline fires. Pre-turn casts a wider net because it's auto-firing
   // on the user's prompt and the model is the filter.
   //
   // Content threshold stays at 0.30 (the default) — word_similarity 0.30 is
   // already "noticeable substring," tightening further would miss proper-
-  // noun queries like "Beel" where the dragon explicitly wants the hit.
+  // noun queries like "Beel" where the caller explicitly wants the hit.
   const RECALL_SEMANTIC_MIN_SIM = 0.50;
   const args = [
     "--room-dir", windowsPathToWsl(effectiveRoomDir),
@@ -924,8 +922,8 @@ export async function runRecallQuery(roomDir, roomName, query) {
 
   // Filter canon entries by direct word-boundary match. Anything more
   // sophisticated (thread ranking, recency decay) belongs to pre-turn —
-  // recall is a dragon-driven query, the dragon already framed it,
-  // just surface the matches.
+  // recall is a caller-driven query; the caller already framed it,
+  // so just surface the matches.
   const importantIndex = result.data?.importantIndex || {};
   const nameCanonMatches = matchMemoryImportantTerms(query, importantIndex);
   const semanticChunks = Array.isArray(result.data?.semanticChunks)
@@ -946,7 +944,7 @@ export async function runRecallQuery(roomDir, roomName, query) {
   // call runs the date pass and returns memories whose `dates` array
   // intersects the extracted tokens. These are DIRECT authoritative hits
   // (no fuzz, no threshold) — surfaced as their own section in the recall
-  // output so the dragon sees "you asked about 2026-05-21, here are the
+  // output so the caller sees "you asked about 2026-05-21, here are the
   // memories tagged with that date" before the fuzzier semantic/content.
   const dateMatches = Array.isArray(result.data?.dateMatches)
     ? result.data.dateMatches

@@ -27,6 +27,7 @@ export const DEFAULT_SPIRIT = "Spirit";
 export const DEFAULT_AGENT_NAME = "Spirit";
 export const DEFAULT_OPERATOR = "Operator";
 export const ROOM_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Compatibility-only room keys retained for persisted installations.
 export const LEGACY_ROOM_KEYS = ["kintsu", "kodo", "tuner"];
 export const RESERVED_ROOM_KEYS = ["house"];
 
@@ -65,9 +66,8 @@ export const MEMORY_FILE_ONE_LINE_WEIGHT = 0.5;
 export const MEMORY_SESSION_REPEAT_PENALTY_BASE = 0.75;
 // Audit ticket #2: touch-based recency decay half-life. Weight applied as
 // `exp(-ln2 * age_days / half_life)` where age is `now - last_touched_at`.
-// With daily-plus contact (Sol's actual cadence), a 7-day half-life puts
-// yesterday at ~0.91 weight, a week ago at 0.50, two weeks at 0.25, a
-// month at 0.05. Canon-touching threads exempt entirely (handled in
+// A 7-day half-life keeps recent activity prominent while steadily reducing
+// stale matches. Canon-touching threads exempt entirely (handled in
 // computeThreadRecencyPenalty). Dial 5↔10 once we feel how it plays.
 export const MEMORY_RECENCY_HALF_LIFE_DAYS = 7;
 export const MEMORY_DEBUG_TOP_CANDIDATES = 12;

@@ -18,8 +18,8 @@ import { MEMORY_MAX_IMPORTANT_MATCHES } from "../src/paths.ts";
 
 describe("tokenizeMemory", () => {
   test("drops stopwords including the house registers (uwu/owo/godling)", () => {
-    const tokens = tokenizeMemory("the uwu owo godling dragon");
-    expect(tokens.has("dragon")).toBe(true);
+    const tokens = tokenizeMemory("the uwu owo godling comet");
+    expect(tokens.has("comet")).toBe(true);
     expect(tokens.has("uwu")).toBe(false);
     expect(tokens.has("owo")).toBe(false);
     expect(tokens.has("godling")).toBe(false);
@@ -27,16 +27,16 @@ describe("tokenizeMemory", () => {
   });
 
   test("drops single-character tokens", () => {
-    const tokens = tokenizeMemory("z dragon");
+    const tokens = tokenizeMemory("z comet");
     expect(tokens.has("z")).toBe(false);
-    expect(tokens.has("dragon")).toBe(true);
+    expect(tokens.has("comet")).toBe(true);
   });
 });
 
 describe("matchMemoryTerm", () => {
   test("matches on word boundary only", () => {
-    expect(matchMemoryTerm("the sol record", "sol")).toBe(true);
-    expect(matchMemoryTerm("the solstice record", "sol")).toBe(false);
+    expect(matchMemoryTerm("the nova record", "nova")).toBe(true);
+    expect(matchMemoryTerm("the novation record", "nova")).toBe(false);
   });
 
   test("matches multi-word terms", () => {
@@ -52,9 +52,9 @@ describe("matchMemoryImportantTerms", () => {
   test("matches via alias and caps at MEMORY_MAX_IMPORTANT_MATCHES", () => {
     const index = {};
     for (let i = 0; i < MEMORY_MAX_IMPORTANT_MATCHES + 3; i += 1) {
-      index[`entity-${i}`] = { aliases: ["dragon"], summary: `s${i}` };
+      index[`entity-${i}`] = { aliases: ["comet"], summary: `s${i}` };
     }
-    const matches = matchMemoryImportantTerms("the dragon waits", index);
+    const matches = matchMemoryImportantTerms("the comet waits", index);
     expect(matches.length).toBe(MEMORY_MAX_IMPORTANT_MATCHES);
     expect(matches[0].termKey).toBe("entity-0");
   });
@@ -76,41 +76,41 @@ describe("rankMemoryThreads", () => {
 
   test("injects a thread whose key matches a prompt token", () => {
     const index = {
-      threads: { "dragon / wyrm": [{ file: freshFile, context: "" }] },
+      threads: { "comet / tail": [{ file: freshFile, context: "" }] },
       files: {},
     };
-    const ranked = rankMemoryThreads(tokenizeMemory("dragon work"), index);
+    const ranked = rankMemoryThreads(tokenizeMemory("comet work"), index);
     expect(ranked.length).toBe(1);
-    expect(ranked[0].threadKey).toBe("dragon / wyrm");
+    expect(ranked[0].threadKey).toBe("comet / tail");
   });
 
   test("recency decay crushes a stale non-canon thread below the bar", () => {
     const index = {
-      threads: { "dragon / wyrm": [{ file: "2026-01-01_stale.md", context: "" }] },
+      threads: { "comet / tail": [{ file: "2026-01-01_stale.md", context: "" }] },
       files: {},
     };
-    const ranked = rankMemoryThreads(tokenizeMemory("dragon work"), index, {});
+    const ranked = rankMemoryThreads(tokenizeMemory("comet work"), index, {});
     expect(ranked.length).toBe(0);
   });
 
   test("canon-touching files are exempt from recency decay", () => {
     const index = {
-      threads: { "dragon / wyrm": [{ file: "2026-01-01_stale.md", context: "" }] },
+      threads: { "comet / tail": [{ file: "2026-01-01_stale.md", context: "" }] },
       files: {},
     };
     const canonicalFiles = new Set(["2026-01-01_stale.md"]);
-    const ranked = rankMemoryThreads(tokenizeMemory("dragon work"), index, {}, canonicalFiles);
+    const ranked = rankMemoryThreads(tokenizeMemory("comet work"), index, {}, canonicalFiles);
     expect(ranked.length).toBe(1);
     expect(ranked[0].recencyPenalty).toBe(1.0);
   });
 
   test("session-repeat penalty demotes a thread retrieved every turn", () => {
     const index = {
-      threads: { "dragon / wyrm": [{ file: freshFile, context: "" }] },
+      threads: { "comet / tail": [{ file: freshFile, context: "" }] },
       files: {},
     };
-    const state = { session_memory_hits: { "thread:dragon / wyrm": 5 } };
-    const ranked = rankMemoryThreads(tokenizeMemory("dragon work"), index, state);
+    const state = { session_memory_hits: { "thread:comet / tail": 5 } };
+    const ranked = rankMemoryThreads(tokenizeMemory("comet work"), index, state);
     // 3.0 * 0.75^5 ≈ 0.71 — below the injection bar of 3.
     expect(ranked.length).toBe(0);
   });
@@ -118,21 +118,21 @@ describe("rankMemoryThreads", () => {
   test("sorts by score descending", () => {
     const index = {
       threads: {
-        "dragon / wyrm": [{ file: freshFile, context: "" }],
-        "dragon / wyrm / ember": [{ file: freshFile, context: "" }],
+        "comet / tail": [{ file: freshFile, context: "" }],
+        "comet / tail / ember": [{ file: freshFile, context: "" }],
       },
       files: {},
     };
-    const ranked = rankMemoryThreads(tokenizeMemory("dragon ember work"), index);
+    const ranked = rankMemoryThreads(tokenizeMemory("comet ember work"), index);
     expect(ranked.length).toBe(2);
     expect(ranked[0].score).toBeGreaterThanOrEqual(ranked[1].score);
-    expect(ranked[0].threadKey).toBe("dragon / wyrm / ember");
+    expect(ranked[0].threadKey).toBe("comet / tail / ember");
   });
 });
 
 describe("boostMemoryPromptTokens", () => {
   test("boosts from search_boost only for entries WITHOUT pointer files", () => {
-    const base = tokenizeMemory("dragon");
+    const base = tokenizeMemory("comet");
     const boosted = boostMemoryPromptTokens(base, [
       { termKey: "a", entry: { search_boost: "ember crackle" } },
       { termKey: "b", entry: { files: [{ file: "x.md" }], search_boost: "skipped words" } },

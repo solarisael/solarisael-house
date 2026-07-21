@@ -233,7 +233,7 @@ export function buildDispatchReceipt(request: DispatchRequest): DispatchReceipt 
     "## Change",
     [
       `Execute this ${lane.name} work packet exactly as assigned.`,
-      "Do not infer Sol's broader intent.",
+      "Do not infer the operator's broader intent beyond the packet.",
       "Do not broaden scope.",
       "If the packet is ambiguous or conflicts with observed source state, stop and report the blocker.",
       "",

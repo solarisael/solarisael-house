@@ -98,7 +98,7 @@ function runMemoryPostgresSemantic(roomDir, roomName, prompt, scopeFiles) {
 }
 
 // Date mode wrapper. Added 2026-05-23. Always GLOBAL — date hits are
-// direct authoritative lookups against memories.dates GIN, the user/dragon
+// direct authoritative lookups against memories.dates GIN, the user or caller
 // literally named a date and this returns memories tagged with it. No
 // embed, no scope-narrowing, cheap due to the GIN index.
 function runMemoryPostgresDate(roomDir, roomName, prompt) {

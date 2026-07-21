@@ -1,12 +1,10 @@
 // Spirit identity: room coercion, contract loading, active_spirit.md writes.
 //
-// The 2026-05-04 fix lives here: cwd-coerced room name beats stale state
-// hints. Without it, a stale embodiedSpirit="kintsu" hint fired Kintsu
-// retrieval into Kodo sessions.
+// The room directory is authoritative over stale persisted identity hints,
+// so retrieval always follows the active room rather than another room's key.
 //
-// The 2026-05-12 fix lives here: missing contract files preserve the
-// requested mode label rather than silently substituting Kintsu's identity
-// + markdown under whatever header.
+// Missing contract files preserve the requested mode label rather than
+// silently substituting a different room identity or markdown header.
 
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -117,7 +115,8 @@ export async function writeActiveSpiritFiles({
   activeSpirit, agentName, state,
   effectiveRoomDir, roomCoercedSpirit, roomDir,
 }) {
-  const spirit = await loadSpiritContract(activeSpirit);
+  // Compatibility mapping for persisted legacy room headers. New rooms use
+  // their requested spirit/mode label without this translation.
   const legacyHeader = {
     kodo: "Kodo",
     kintsu: "Kintsu",

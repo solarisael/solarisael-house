@@ -21,17 +21,17 @@ class Conn:
 
 def row(i, scope="shared", project="", shape="process", tags=None, trigger=""):
     return {"id": i, "title": f"lesson {i}", "lesson": "text", "proof_pattern": "proof",
-            "trigger_context": trigger, "scope": scope, "project": project, "voice": "kodo",
+            "trigger_context": trigger, "scope": scope, "project": project, "voice": "generic",
             "shape": shape, "tags": tags or []}
 
 
 class LessonContextTests(unittest.TestCase):
     def test_ranking_precedence_and_scope(self):
         conn = Conn([row(2, trigger="deploy"), row(1, tags=["deploy"]), row(3, shape="deploy")], [])
-        result = lesson_context.retrieve_lesson_context(conn, "kintsu", shapes=["deploy"], terms=["deploy"], limit=3)
+        result = lesson_context.retrieve_lesson_context(conn, "sample-room", shapes=["deploy"], terms=["deploy"], limit=3)
         self.assertEqual([x["id"] for x in result["codingLessons"]], [2, 1, 3])
-        self.assertEqual(result["match"]["scopes"], ["shared", "kintsu"])
-        self.assertEqual(conn.cursor_obj.calls[0][1], (["shared", "kintsu"],))
+        self.assertEqual(result["match"]["scopes"], ["shared", "sample-room"])
+        self.assertEqual(conn.cursor_obj.calls[0][1], (["shared", "sample-room"],))
 
     def test_exact_projects_and_bounded_deterministic_order(self):
         conn = Conn([row(9, project="other"), row(2, project="app"), row(1, project="app")], [row(4, project="app"), row(3, project="app2")])

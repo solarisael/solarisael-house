@@ -21,7 +21,7 @@ class PostgresMemorySourceRoomTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             room_dir = Path(temp_dir) / "custom-room"
             room_dir.mkdir()
-            for invalid in ("Custom-Room", "custom_room", "custom room", "../kodo"):
+            for invalid in ("Custom-Room", "custom_room", "custom room", "../other-room"):
                 with self.subTest(invalid=invalid):
                     with self.assertRaisesRegex(ValueError, "invalid room key"):
                         source.resolve_room_name(invalid, room_dir)

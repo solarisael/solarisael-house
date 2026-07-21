@@ -139,7 +139,7 @@ class UpdateLessonTests(unittest.TestCase):
             "project-lesson",
             7,
             "Current title",
-            {"project": "solarisael", "proof_pattern": "Focused proof"},
+            {"project": "sample-project", "proof_pattern": "Focused proof"},
         )
 
         self.assertTrue(result["ok"])

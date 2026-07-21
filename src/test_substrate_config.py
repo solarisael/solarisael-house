@@ -40,8 +40,8 @@ class SubstrateConfigTests(unittest.TestCase):
     def test_windows_drive_path_converts_for_posix_runtime(self):
         with patch("substrate_config.os.name", "posix"), patch("substrate_config.shutil.which", return_value=None):
             self.assertEqual(
-                windows_path_to_wsl(r"C:\Solarisael\Obsidian\substrate"),
-                "/mnt/c/Solarisael/Obsidian/substrate",
+                windows_path_to_wsl(r"C:\Example\Obsidian\substrate"),
+                "/mnt/c/Example/Obsidian/substrate",
             )
 
     def test_invalid_override_fails_closed(self):
@@ -60,11 +60,11 @@ class SubstrateConfigTests(unittest.TestCase):
             "PGHOST=file-host\nPGPORT=5432\nPGDATABASE=house\nOTHER=value\n",
             encoding="utf-8",
         )
-        with patch.dict(os.environ, {"PGHOST": "process-host", "PGUSER": "sol"}, clear=False):
+        with patch.dict(os.environ, {"PGHOST": "process-host", "PGUSER": "db-user"}, clear=False):
             env = load_postgres_env(self.default_dir)
         self.assertEqual(env["PGHOST"], "process-host")
         self.assertEqual(env["PGPORT"], "5432")
-        self.assertEqual(env["PGUSER"], "sol")
+        self.assertEqual(env["PGUSER"], "db-user")
         self.assertEqual(env["OTHER"], "value")
 
 

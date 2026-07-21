@@ -13,7 +13,7 @@ import { injectRoomMemoryContext, runRecallQuery } from "../src/memory.ts";
 const ENV_KEYS = [
   "SOLARISAEL_MEMORY_SOURCE",
   "SOLARISAEL_HOUSE_DISABLE_POSTGRES",
-  "KINTSU_MEM_DEBUG",
+  "SOLARISAEL_MEM_DEBUG",
 ];
 
 function snapshotEnv() {
@@ -48,9 +48,9 @@ async function writeJson(target, value) {
   await writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-async function createKintsuFixture() {
+async function createSampleRoomFixture() {
   const root = await mkdtemp(path.join(tmpdir(), "solarisael-memory-json-"));
-  const roomDir = path.join(root, "kintsu");
+  const roomDir = path.join(root, "sample-room");
   await mkdir(path.join(roomDir, "memory"), { recursive: true });
 
   await writeFile(
@@ -131,10 +131,10 @@ async function createKintsuFixture() {
 
 describe("forced JSON memory sources", () => {
   test("lexical source returns JSON indexes with the forced JSON fallback reason", async () => {
-    const { root, roomDir, index, importantIndex } = await createKintsuFixture();
+    const { root, roomDir, index, importantIndex } = await createSampleRoomFixture();
     try {
       await withForcedJsonEnv(async () => {
-        const result = await loadMemoryLexicalSources(roomDir, "kintsu", "blue hinge lantern");
+        const result = await loadMemoryLexicalSources(roomDir, "sample-room", "blue hinge lantern");
 
         expect(result.indexSource).toBe("json");
         expect(result.importantSource).toBe("json");
@@ -149,24 +149,24 @@ describe("forced JSON memory sources", () => {
   });
 
   test("semantic, content, and date loaders preserve preflight skip labels and force-skip live sources", async () => {
-    const { root, roomDir } = await createKintsuFixture();
+    const { root, roomDir } = await createSampleRoomFixture();
     try {
       await withForcedJsonEnv(async () => {
-        await expect(loadMemorySemanticSource(roomDir, "kintsu", "", ["memory/a.md"]))
+        await expect(loadMemorySemanticSource(roomDir, "sample-room", "", ["memory/a.md"]))
           .resolves.toMatchObject({ semanticSource: "skip-no-scope", semanticChunks: [] });
-        await expect(loadMemorySemanticSource(roomDir, "kintsu", "blue hinge", []))
+        await expect(loadMemorySemanticSource(roomDir, "sample-room", "blue hinge", []))
           .resolves.toMatchObject({ semanticSource: "skip-no-scope", semanticChunks: [] });
-        await expect(loadMemorySemanticSource(roomDir, "kintsu", "blue hinge", ["memory/2026-07-04_blue_hinge.md"]))
+        await expect(loadMemorySemanticSource(roomDir, "sample-room", "blue hinge", ["memory/2026-07-04_blue_hinge.md"]))
           .resolves.toMatchObject({ semanticSource: "skip-forced-json", semanticChunks: [] });
 
-        await expect(loadMemoryContentSource(roomDir, "kintsu", ""))
+        await expect(loadMemoryContentSource(roomDir, "sample-room", ""))
           .resolves.toMatchObject({ contentSource: "skip-no-prompt", contentChunks: [] });
-        await expect(loadMemoryContentSource(roomDir, "kintsu", "blue hinge"))
+        await expect(loadMemoryContentSource(roomDir, "sample-room", "blue hinge"))
           .resolves.toMatchObject({ contentSource: "skip-forced-json", contentChunks: [] });
 
-        await expect(loadMemoryDateSource(roomDir, "kintsu", ""))
+        await expect(loadMemoryDateSource(roomDir, "sample-room", ""))
           .resolves.toMatchObject({ dateSource: "skip-no-prompt", dateMatches: [], queryDates: [] });
-        await expect(loadMemoryDateSource(roomDir, "kintsu", "blue hinge 2026-07-04"))
+        await expect(loadMemoryDateSource(roomDir, "sample-room", "blue hinge 2026-07-04"))
           .resolves.toMatchObject({ dateSource: "skip-forced-json", dateMatches: [], queryDates: [] });
       });
     } finally {
@@ -177,7 +177,7 @@ describe("forced JSON memory sources", () => {
 
 describe("forced JSON memory orchestration", () => {
   test("injectRoomMemoryContext adds memory and canon system-reminder parts from JSON fixtures", async () => {
-    const { root, roomDir } = await createKintsuFixture();
+    const { root, roomDir } = await createSampleRoomFixture();
     try {
       await withForcedJsonEnv(async () => {
         const output = {
@@ -205,13 +205,13 @@ describe("forced JSON memory orchestration", () => {
 
         expect(memoryPart?.synthetic).toBe(true);
         expect(memoryPart?.text).toContain("Room memory was retrieved automatically for this user turn.");
-        expect(memoryPart?.text).toContain("## Kintsu Memory Retrieval - auto-loaded context");
+        expect(memoryPart?.text).toContain("## Sample-room Memory Retrieval - auto-loaded context");
         expect(memoryPart?.text).toContain("memory/2026-07-04_blue_hinge.md:1-4");
         expect(memoryPart?.text).toContain("The blue hinge keeps lantern retrieval deterministic without Postgres.");
 
         expect(canonPart?.synthetic).toBe(true);
         expect(canonPart?.text).toContain("Canon assertions for this turn");
-        expect(canonPart?.text).toContain("## Kintsu Canon Assertions");
+        expect(canonPart?.text).toContain("## Sample-room Canon Assertions");
         expect(canonPart?.text).toContain("### hidden anchor canon (project)");
         expect(canonPart?.text).toContain("The hidden anchor canon must surface when its pointer file is active.");
       });
@@ -221,10 +221,10 @@ describe("forced JSON memory orchestration", () => {
   });
 
   test("casual route records semantic and content as skipped by query routing without live sources", async () => {
-    const { root, roomDir } = await createKintsuFixture();
+    const { root, roomDir } = await createSampleRoomFixture();
     try {
       await withForcedJsonEnv(async () => {
-        process.env.KINTSU_MEM_DEBUG = "1";
+        process.env.SOLARISAEL_MEM_DEBUG = "1";
         const output = {
           messages: [
             {
@@ -254,10 +254,10 @@ describe("forced JSON memory orchestration", () => {
   });
 
   test("runRecallQuery returns JSON candidates for every entry in a ranked thread plus canon matches", async () => {
-    const { root, roomDir } = await createKintsuFixture();
+    const { root, roomDir } = await createSampleRoomFixture();
     try {
       await withForcedJsonEnv(async () => {
-        const result = await runRecallQuery(roomDir, "kintsu", "blue hinge lantern canon");
+        const result = await runRecallQuery(roomDir, "sample-room", "blue hinge lantern canon");
 
         expect(result.ok).toBe(true);
         expect(result.semanticChunks).toEqual([]);
