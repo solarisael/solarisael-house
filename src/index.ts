@@ -1,3 +1,5 @@
+export const CORE_API_VERSION = 1;
+
 export {
   KEYWORD_TRIGGERS,
   PROCESS_SHAPE_TRIGGERS,
@@ -46,6 +48,14 @@ export {
   POSTGRES_MEMORY_SOURCE_SCRIPT,
 } from "./paths.ts";
 
-export { runAnamnesisQuery } from "./memory.ts";
+export {
+  runAnamnesisQuery,
+  runRecallQuery,
+} from "./memory.ts";
+
+export {
+  logAssistantTurn,
+  logUserTurn,
+} from "./ledger.ts";
 
 export type { NormalizedMessage, NudgeDecision } from "./triggers-core.ts";
