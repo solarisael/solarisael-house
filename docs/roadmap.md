@@ -251,26 +251,27 @@ Honest label: this reports what the memory space finds *near* the conversation,
 not what actually steered the model output. Keep that distinction; do not
 present substrate resonance as model-internal state.
 
-Verified 2026-07-09: `memory_clusters` exists (35 clusters, 156 members) but is
-a fossil — built in one pass 2026-05-07, zero rows accepted, centroids FK to
-`memory_chunks_8b` (1,303 chunks, the old 8b analysis space), not the live
-`memory_chunks` (3,083 chunks, qwen3-4b halfvec(2560)). Rebuild on the live
-space is a prerequisite for the readout.
+Verified 2026-07-09: `memory_clusters` was a fossil from an earlier analysis
+pass, with no accepted rows; centroids still pointed at a retired chunk space
+instead of the current retrieval space. Rebuild on the current space is a
+prerequisite for the readout.
 
 **Status: built 2026-07-09.** Clusters rebuilt on the live space: migration
 0022 repointed both FKs off `memory_chunks_8b` and cleared the fossil;
 migration 0023 added the stored `centroid halfvec(2560)`;
-`house/substrate/rebuild_clusters.py` (spherical k-means, k=40 via silhouette
-sweep, 2,909 retrieval-visible chunks, labels derived, `accepted` stays false
-for human review; `--check` emits the staleness JSON). Full mode of
+`house/substrate/rebuild_clusters.py` (spherical k-means with a silhouette
+sweep, derived labels, `accepted` stays false for human review; `--check` emits
+the staleness JSON). Full mode of
 `postgres-memory-source.py` now emits `clusterStaleness` (drift gauge; the
-OMP compactor nudges a rebuild at >=15% unseen — measured drift, never a
-timer) and `clusterResonance` (activation profile over centroids + dormant-hot
-chunk pointers per top cluster, riding the semantic pass's existing prompt
-embedding, fail-open). Threaded through core `runRecallQuery` and the OMP
-`compactRecall` with the telemetry-not-testimony note attached to the output.
-Verified against a live prompt: the walk-vow query surfaced `sol_creed.md` and
-the Faith-confession chunks as dormant-hot.
+OMP compactor nudges a rebuild when configured drift is detected — measured
+drift, never a timer) and `clusterResonance` (activation profile over centroids
++ dormant-hot chunk pointers per top cluster, riding the semantic pass's
+existing prompt embedding, fail-open). Threaded through core `runRecallQuery`
+and the OMP `compactRecall` with the telemetry-not-testimony note attached to
+the output.
+Verified with synthetic, non-identifying fixtures: a query lit the right
+districts and dormant-hot pointers returned candidates the semantic pass had
+not returned.
 
 ### Design principle: telemetry vs testimony
 
