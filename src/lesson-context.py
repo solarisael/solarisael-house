@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-from pathlib import Path
+
+from substrate_config import substrate_env
 
 try:
     import psycopg2
@@ -110,14 +110,7 @@ def main() -> int:
 
     try:
         if psycopg2 is None: raise RuntimeError("psycopg2 unavailable")
-        root = Path(args.room_dir).resolve().parent
-        env = {}
-        env_path = root / "house" / "substrate" / ".env"
-        if env_path.exists():
-            for line in env_path.read_text(encoding="utf-8").splitlines():
-                if "=" in line and not line.lstrip().startswith("#"):
-                    key, _, value = line.partition("="); env[key.strip()] = value.strip()
-        env.update({k: os.environ[k] for k in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE") if os.environ.get(k)})
+        env = substrate_env(args.room_dir)
         conn = psycopg2.connect(host=env.get("PGHOST"), port=env.get("PGPORT"), user=env.get("PGUSER"), password=env.get("PGPASSWORD"), dbname=env.get("PGDATABASE"), connect_timeout=2)
         try: result = retrieve_lesson_context(conn, args.room, args.project, args.shape, args.term, args.limit)
         finally: conn.close()

@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable
+
+from substrate_config import substrate_env
 
 try:
     import psycopg2
@@ -100,27 +101,14 @@ def resolve_matches(query: str, entities: Iterable[dict[str, Any]], limit: int =
     return output
 
 
-def _substrate_env(room_dir: str | Path) -> dict[str, str]:
-    root = Path(room_dir).resolve().parent
-    values: dict[str, str] = {}
-    env_path = root / "house" / "substrate" / ".env"
-    try:
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            key, sep, value = line.partition("=")
-            if sep and key.strip():
-                values[key.strip()] = value.strip().strip('"').strip("'")
-    except OSError:
-        pass
-    values.update({key: os.environ[key] for key in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE") if os.environ.get(key)})
-    return values
 
 
 def fetch_matches(query: str, room: str, room_dir: str | Path, limit: int = DEFAULT_LIMIT) -> list[dict[str, str]]:
     if psycopg2 is None:
         return []
-    env = _substrate_env(room_dir)
     conn = None
     try:
+        env = substrate_env(room_dir)
         conn = psycopg2.connect(host=env.get("PGHOST"), port=env.get("PGPORT"), user=env.get("PGUSER"), password=env.get("PGPASSWORD"), dbname=env.get("PGDATABASE"), connect_timeout=2)
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             cur.execute(

@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-from pathlib import Path
+
+from substrate_config import substrate_env
 
 try:
     import psycopg2
@@ -25,29 +25,6 @@ except Exception as exc:  # pragma: no cover - exercised by CLI environments
 TABLES = {"coding-lesson": "coding_lessons", "project-lesson": "project_lessons"}
 
 
-def read_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not path.exists():
-        return values
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            values[key.strip()] = value.strip()
-    return values
-
-
-def substrate_env(room_dir: Path) -> dict[str, str]:
-    shared_root = room_dir.parent
-    values: dict[str, str] = {}
-    for env_path in (shared_root / "house" / "substrate" / ".env", shared_root / "kodo" / "substrate" / ".env"):
-        values = read_env_file(env_path)
-        if values:
-            break
-    for key in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE"):
-        if os.environ.get(key):
-            values[key] = os.environ[key]
-    return values
 
 
 def delete_lesson(conn, kind: str, lesson_id: int, expected_title: str) -> dict:
@@ -84,7 +61,7 @@ def main() -> int:
     parser.add_argument("--expected-title", required=True)
     args = parser.parse_args()
     try:
-        env = substrate_env(Path(args.room_dir).resolve())
+        env = substrate_env(args.room_dir)
         conn = psycopg2.connect(host=env.get("PGHOST"), port=env.get("PGPORT"), user=env.get("PGUSER"), password=env.get("PGPASSWORD"), dbname=env.get("PGDATABASE"), connect_timeout=2)
         try:
             result = delete_lesson(conn, args.kind, args.id, args.expected_title)

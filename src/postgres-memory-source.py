@@ -43,6 +43,11 @@ import urllib.error
 from datetime import date
 from pathlib import Path
 
+from substrate_config import (
+    load_postgres_env,
+    resolve_substrate_dir,
+    windows_path_to_wsl,
+)
 # Force UTF-8 on stdout — payload contains characters like '→' that break
 # Windows default cp1252. The plugin spawns this on Windows, reads stdout JSON.
 sys.stdout.reconfigure(encoding="utf-8")
@@ -665,34 +670,6 @@ def load_search_candidates(
     return terms, candidates[:top_k]
 
 
-def read_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not path.exists():
-        return out
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        out[key.strip()] = value.strip()
-
-    return out
-
-
-def substrate_env(room_dir: Path) -> dict[str, str]:
-    # Substrate moved kodo/substrate/ → house/substrate/ on 2026-05-07
-    # (shared infra used by both rooms). Resolve relative-first under the vault
-    # root, fall back to PG* env vars or hardcoded host fallback.
-    shared_root = room_dir.parent
-    env_path = shared_root / "house" / "substrate" / ".env"
-    values = read_env_file(env_path)
-
-    for key in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE"):
-        if os.environ.get(key):
-            values[key] = os.environ[key]
-
-    return values
 
 
 def connect(env: dict[str, str]):
@@ -1589,6 +1566,11 @@ def main() -> int:
         help="Embedding model id (Ollama tag like 'qwen3-embedding:4b' or LMStudio model name).",
     )
     parser.add_argument(
+        "--substrate-dir",
+        default=None,
+        help="Substrate directory override; otherwise SOLARISAEL_SUBSTRATE or the sibling default is used.",
+    )
+    parser.add_argument(
         "--mode",
         choices=("full", "lexical", "semantic", "content", "date", "taxonomy", "candidates", "fetch", "anamnesis"),
         default="full",
@@ -1693,7 +1675,7 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    room_dir = Path(args.room_dir).resolve()
+    room_dir = Path(windows_path_to_wsl(args.room_dir)).resolve()
     # Derive room name from cwd basename if not explicitly passed. Fixes the
     # 2026-05-04 bug where opencode-Kodo's session loaded Kintsu memory because
     # load_index/load_important_index defaulted to "kintsu" regardless of cwd.
@@ -1706,7 +1688,8 @@ def main() -> int:
     if args.scope_files:
         scope_files = [s.strip() for s in args.scope_files.split(",") if s.strip()]
 
-    env = substrate_env(room_dir)
+    substrate_dir = resolve_substrate_dir(room_dir, args.substrate_dir)
+    env = load_postgres_env(substrate_dir)
     conn = connect(env)
     erasure_columns = detect_erasure_columns(conn)
     include_archived = bool(args.include_archived)
@@ -1820,9 +1803,6 @@ def main() -> int:
                 # Best-effort: if the helper import fails for any reason, fall
                 # straight through to embed_query — never break fail-open.
                 try:
-                    substrate_dir = (
-                        Path(args.room_dir).resolve().parent / "house" / "substrate"
-                    )
                     if str(substrate_dir) not in sys.path:
                         sys.path.insert(0, str(substrate_dir))
                     from embed_4b_pass import ensure_ollama_up
