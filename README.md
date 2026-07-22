@@ -18,17 +18,24 @@ For relationships, the House keeps identity and shared history available across 
 
 ## Features
 
-- **Persistent rooms — Base:** Keep one identity, room state, and private scope across sessions.
-- **Restart continuity — Base:** Recover selected context after the agent process stops.
-- **Separate context layers — Base:** Keep stable identity apart from current state and recent context.
-- **Multiple rooms — Base:** Give each room its own key, identity, paths, and memory scope.
-- **Memory lifecycle tools — Full:** Use explicit tools to remember, recall, sleep, and wake.
-- **Hybrid retrieval — Full:** Search text, vectors, content, entities, dates, threads, clusters, and lessons.
-- **Evidence and authority — Full:** Show each result with its source and current authority state.
-- **Corrections and supersession — Full:** Replace stale authority without deleting the historical record.
-- **Typed stores — Full:** Keep memories and reusable lessons in separate stores.
-- **Local embeddings — Full:** Build semantic search without sending the archive to a hosted embedding service.
-- **Health states — Base and Full:** Report Base, Full, or configured-but-degraded from observed checks.
+The table names both the user feature and its implementation.
+
+| Feature | Mode | Technical implementation |
+|---|---|---|
+| Persistent rooms | Base | Room-local Markdown and JSON files, `AGENTS.md`, `active_spirit.md`, and `.solarisael-room.json` |
+| Restart continuity | Base | OMP lifecycle hooks, room-local conversation logs, and compact context files |
+| Separate context layers | Base | Identity files, room state, recent context, and archive paths remain separate |
+| Multiple rooms | Base | Working-directory discovery, stable room keys, room-scoped paths, and private memory scope |
+| Adapter runtime | Base | TypeScript extensions run through Bun and the OMP extension API |
+| Memory lifecycle tools | Full | OMP tools call the Python substrate for `remember`, `recall`, `sleep`, and `wake` |
+| Hybrid retrieval | Full | PostgreSQL full-text search, `pgvector`, direct content search, entities, dates, threads, taxonomy, and clusters |
+| Local semantic search | Full | Ollama serves `qwen3-embedding:4b` vectors with 2,560 dimensions |
+| Evidence viewport | Full | Ranked bundles include source provenance, authority state, selection reasons, and suppression diagnostics |
+| Corrections | Full | Supersession removes stale authority while PostgreSQL keeps the historical row |
+| Typed stores | Full | Separate PostgreSQL tables hold memories, coding lessons, project lessons, writing lessons, and audio lessons |
+| Installation checks | Base | `verify-install.ts`, `room_state`, a fresh room session, and a restart continuity test |
+| Substrate checks | Full | `health.py`, a real memory write and read, and a lifecycle smoke test |
+| Health states | Base and Full | Checks report Base, Full, or configured-but-degraded |
 
 ## Choose how to use this repository
 
