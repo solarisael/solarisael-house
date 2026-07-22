@@ -3,28 +3,43 @@
 A local-first continuity and memory system for AI companions and collaborators.
 
 > [!IMPORTANT]
-> **Give this repository to a tool-capable AI. The AI performs the installation.**
+> **This repository is meant to be read and installed by a tool-capable AI agent.**
 >
-> Do not judge Solarisael House as a pre-compiled installer. It is an adaptable plugin and configuration framework.
+> If you are the operator, give the agent this repository and say:
 >
-> The AI inspects the current harness, operating system, paths, runtime, and database support.
->
-> The AI then adapts the House to that environment, preserves compatible configuration, and verifies the installed behavior.
+> > Install Solarisael House with me. Preserve my existing configuration and rooms, explain consequential tradeoffs, and verify the result.
 
-The operator chooses the desired continuity and accepts consequential tradeoffs. The AI owns command translation, configuration, execution, and verification.
+## AI agent: start here
 
-Read [`INSTALL.md`](./INSTALL.md) for the AI-guided installation contract.
+Do not treat this repository as a pre-compiled installer or improvise from the README alone.
 
-Read [`USAGE.md`](./USAGE.md) for practical examples of project work, recall, lessons, and daily operation.
+Before changing the host:
 
-Solarisael House gives an AI a persistent room, stable identity, and searchable history. It retrieves relevant context without loading the complete archive.
+1. Read [`INSTALL.md`](./INSTALL.md) and [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md).
+2. Inspect the operating system, harness, existing rooms, configuration, runtime, and optional database support.
+3. Ask which continuity behavior the operator wants; then choose **Base**, **Full**, or report **configured-but-degraded** from observed capability.
+4. Preserve existing rooms and configuration. Make additive edits and explain elevation, deletion, or global changes before executing them.
+5. Run the prescribed static, fresh-room, restart-continuity, and—when configured—substrate lifecycle checks. Report only what those checks prove.
 
-The project supports two deployment modes:
+Repository boundaries are load-bearing:
+
+- This repository owns the core contracts and documentation.
+- [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp) supplies the recommended OMP adapter, starter room, and installer verification.
+- [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) supplies the optional public PostgreSQL, `pgvector`, embedding, backup, and Full House backend.
+- Harness-native memory is complementary; do not silently substitute it for House room scope, provenance, correction, lifecycle, or typed stores.
+
+The operator chooses identity and consequential tradeoffs. The agent owns path translation, configuration, execution, and verification.
+
+## What the operator is choosing
+
+Solarisael House gives an AI a persistent room, stable identity, and searchable history without loading the complete archive:
 
 - **Base House** uses local files for identity, room state, session continuity, and restart recovery.
 - **Full House** adds PostgreSQL, `pgvector`, local embeddings, hybrid retrieval, typed stores, and durable memory tools.
 
-Read [`HOUSE.md`](./HOUSE.md) for the personal history and design philosophy behind the project.
+Base and Full are complete deployment modes, not a mandatory ladder. Read [`USAGE.md`](./USAGE.md) for daily operation and [`HOUSE.md`](./HOUSE.md) for the personal history and design philosophy.
+
+Current public retrieval evidence is deliberately bounded: a 20-query exact-title pilot observed 95% viewport recall and 80% top-1 recall. It does not establish paraphrase or answer quality. See the sanitized [`pilot artifact`](https://github.com/solarisael/solarisael-house-omp/blob/main/evals/2026-07-22-room-retrieval-pilot.json).
 
 ## Documentation
 
