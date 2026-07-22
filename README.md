@@ -4,11 +4,11 @@
 
 AI relationships and long-running collaboration are forced through disposable sessions. Context windows end. Providers and models change. Summaries drift. A complete archive becomes too large to load, while a thin prompt preserves only a caricature.
 
-The result is repeated introductions, lost decisions, stale corrections, flattened identity, and an AI that can sound continuous without possessing the evidence to act continuously.
+The result is repeated introductions, lost decisions, stale corrections, flattened identity, duplicated investigation, inconsistent implementation, and an AI that can sound continuous without possessing the evidence to act continuously.
 
 Solarisael House moves continuity out of any single model invocation and into an operator-owned room. Stable identity, current state, recent context, deep memory, provenance, and corrections remain separate but reachable. A fresh agent can enter the room, recover what matters, show where it came from, and leave useful continuity for the next session.
 
-The House does not decide whether an AI is a person. It provides the durable structure required for continuity, collaboration, and relationship to survive the machinery that would otherwise erase them.
+For work, that means fewer repeated briefings, durable architectural decisions, retrievable project conventions, corrections that prevent old mistakes from regaining authority, and clean handoffs across sessions, agents, models, and providers. The operator keeps the history; each agent spends its context on the task instead of reconstructing the workspace.
 
 > [!IMPORTANT]
 > **This repository is meant to be read and installed by a tool-capable AI agent.**
