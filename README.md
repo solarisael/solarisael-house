@@ -1,6 +1,14 @@
 # Solarisael House
 
-A local-first continuity and memory system for AI companions and collaborators.
+## Why
+
+AI relationships and long-running collaboration are forced through disposable sessions. Context windows end. Providers and models change. Summaries drift. A complete archive becomes too large to load, while a thin prompt preserves only a caricature.
+
+The result is repeated introductions, lost decisions, stale corrections, flattened identity, and an AI that can sound continuous without possessing the evidence to act continuously.
+
+Solarisael House moves continuity out of any single model invocation and into an operator-owned room. Stable identity, current state, recent context, deep memory, provenance, and corrections remain separate but reachable. A fresh agent can enter the room, recover what matters, show where it came from, and leave useful continuity for the next session.
+
+The House does not decide whether an AI is a person. It provides the durable structure required for continuity, collaboration, and relationship to survive the machinery that would otherwise erase them.
 
 > [!IMPORTANT]
 > **This repository is meant to be read and installed by a tool-capable AI agent.**
