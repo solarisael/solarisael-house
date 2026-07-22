@@ -16,7 +16,35 @@ For work, the House keeps project decisions, conventions, corrections, and hando
 
 For relationships, the House keeps identity and shared history available across restarts. A provider or model change does not erase the room.
 
-## Start here
+## Features
+
+- **Persistent rooms — Base:** Keep one identity, room state, and private scope across sessions.
+- **Restart continuity — Base:** Recover selected context after the agent process stops.
+- **Separate context layers — Base:** Keep stable identity apart from current state and recent context.
+- **Multiple rooms — Base:** Give each room its own key, identity, paths, and memory scope.
+- **Memory lifecycle tools — Full:** Use explicit tools to remember, recall, sleep, and wake.
+- **Hybrid retrieval — Full:** Search text, vectors, content, entities, dates, threads, clusters, and lessons.
+- **Evidence and authority — Full:** Show each result with its source and current authority state.
+- **Corrections and supersession — Full:** Replace stale authority without deleting the historical record.
+- **Typed stores — Full:** Keep memories and reusable lessons in separate stores.
+- **Local embeddings — Full:** Build semantic search without sending the archive to a hosted embedding service.
+- **Health states — Base and Full:** Report Base, Full, or configured-but-degraded from observed checks.
+
+## Choose how to use this repository
+
+### Understand the project
+
+Use this mode when you want an explanation before installation.
+
+If you are the operator, send this request:
+
+> Read Solarisael House as a product and architecture guide. Explain its purpose, features, modes, data flow, privacy boundaries, and tradeoffs. Do not install or change anything.
+
+If you are the AI agent, read this README first. Then read [`USAGE.md`](./USAGE.md) for workflows and [`HOUSE.md`](./HOUSE.md) for design reasons.
+
+Explain Base House and Full House separately. Name the repository that owns each system part. Separate verified behavior from planned work.
+
+### Install the project
 
 > [!IMPORTANT]
 > Give this repository to a tool-capable AI agent. The agent performs the installation with the operator.
@@ -25,7 +53,7 @@ If you are the operator, send this request:
 
 > Install Solarisael House with me. Preserve my rooms and configuration. Explain important choices before you make changes. Verify the result.
 
-If you are the AI agent, read [`INSTALL.md`](./INSTALL.md) before you change the host. Read [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) before you create or edit an identity.
+If you are the AI agent, read [`INSTALL.md`](./INSTALL.md) before you change the host. Read [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) before you edit an identity.
 
 ### Rules for the installing agent
 
