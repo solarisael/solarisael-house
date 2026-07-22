@@ -1,5 +1,7 @@
 # Solarisael House
 
+A local-first continuity and memory system for AI companions, work partners, and long-running agents.
+
 ## Why
 
 AI work and relationships happen through sessions that end. Models change. Providers change. Context windows fill. Summaries lose detail.
