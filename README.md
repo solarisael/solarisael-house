@@ -29,7 +29,10 @@ The table names both the user feature and its implementation.
 | Adapter runtime | Base | TypeScript extensions run through Bun and the OMP extension API |
 | Memory lifecycle tools | Full | OMP tools call the Python substrate for `remember`, `recall`, `sleep`, and `wake` |
 | Hybrid retrieval | Full | PostgreSQL full-text search, `pgvector`, direct content search, entities, dates, threads, taxonomy, and clusters |
-| Local semantic search | Full | Ollama serves `qwen3-embedding:4b` vectors with 2,560 dimensions |
+| Embedding choice | Full | Use any compatible Ollama or OpenAI-style embedding endpoint |
+| Tested embedding default | Full | Ollama serves `qwen3-embedding:4b` vectors with 2,560 dimensions |
+| Vector rebuilds | Full | Rebuild all memory vectors, lesson vectors, and `pgvector` indexes at any time |
+| Vector compatibility | Full | Use one vector space for indexing and recall; migrate the database column before a dimension change |
 | Evidence viewport | Full | Ranked bundles include source provenance, authority state, selection reasons, and suppression diagnostics |
 | Corrections | Full | Supersession removes stale authority while PostgreSQL keeps the historical row |
 | Typed stores | Full | Separate PostgreSQL tables hold memories, coding lessons, project lessons, writing lessons, and audio lessons |
