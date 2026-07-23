@@ -1,6 +1,6 @@
 //! Newline-delimited JSON wire protocol, version 1.
 
-use house_core::{RecallRequest, RememberKind, RememberReceipt, RememberRequest, RoomKey};
+use house_core::{AnamnesisActivation, AnamnesisAddRequest, AnamnesisAppendReceipt, AnamnesisAppendRequest, AnamnesisFidelity, AnamnesisKind, AnamnesisReadMode, AnamnesisReadRequest, AnamnesisReceipt, AnamnesisSeedRep, RecallRequest, RememberKind, RememberReceipt, RememberRequest, RoomKey};
 use serde::{de::{DeserializeOwned, Error as DeError}, Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
@@ -294,21 +294,105 @@ impl TryFrom<RememberParams> for RememberRequest {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AnamnesisParams {
+    pub room: String,
+    pub mode: String,
+    #[serde(default)]
+    pub query: Option<String>,
+    #[serde(default = "default_anamnesis_limit")]
+    pub limit: u32,
+}
+fn default_anamnesis_limit() -> u32 { 10 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AnamnesisWriteParams {
+    pub operation: String,
+    #[serde(default)] pub room: Option<String>,
+    #[serde(default)] pub kind: Option<String>,
+    #[serde(default)] pub fidelity: Option<String>,
+    #[serde(default)] pub activation: Option<String>,
+    #[serde(default)] pub title: Option<String>,
+    #[serde(default)] pub shape: Option<String>,
+    #[serde(default)] pub dormant: bool,
+    #[serde(default)] pub ramp: Option<String>,
+    #[serde(default)] pub counsel: Option<String>,
+    #[serde(default)] pub peak: Option<String>,
+    #[serde(default)] pub beginning: Option<String>,
+    #[serde(default)] pub verify_note: Option<String>,
+    #[serde(default)] pub canon: Vec<String>,
+    #[serde(default)] pub source_paths: Vec<String>,
+    #[serde(default)] pub tags: Vec<String>,
+    #[serde(default)] pub allow_empty_cycle: bool,
+    #[serde(default)] pub seed_rep: Option<AnamnesisSeedRepParams>,
+    #[serde(default)] pub rep_number: Option<u32>,
+    #[serde(default)] pub occurred_on: Option<String>,
+    #[serde(default)] pub how_it_went: Option<String>,
+    #[serde(default)] pub portal_pull: Option<String>,
+    #[serde(default)] pub lighter: Option<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AnamnesisSeedRepParams { pub number: u32, #[serde(default)] pub occurred_on: Option<String>, pub how_it_went: String, pub portal_pull: String, pub lighter: String }
+
+impl TryFrom<AnamnesisParams> for AnamnesisReadRequest {
+    type Error = ProtocolError;
+    fn try_from(p: AnamnesisParams) -> Result<Self, Self::Error> {
+        let room = RoomKey::for_anamnesis(p.room).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let mode = AnamnesisReadMode::parse(&p.mode).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        Self::new(room, mode, p.query, p.limit).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+    }
+}
+impl TryFrom<AnamnesisWriteParams> for AnamnesisAddRequest {
+    type Error = ProtocolError;
+    fn try_from(p: AnamnesisWriteParams) -> Result<Self, Self::Error> {
+        if p.operation != "add" { return Err(ProtocolError::InvalidParams("operation is not add".into())); }
+        let room = RoomKey::for_anamnesis(p.room.ok_or_else(|| ProtocolError::InvalidParams("add requires room".into()))?).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let kind = AnamnesisKind::parse(&p.kind.ok_or_else(|| ProtocolError::InvalidParams("add requires kind".into()))?).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let fidelity = AnamnesisFidelity::parse(&p.fidelity.ok_or_else(|| ProtocolError::InvalidParams("add requires fidelity".into()))?).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let activation = AnamnesisActivation::parse(&p.activation.ok_or_else(|| ProtocolError::InvalidParams("add requires activation".into()))?).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        if kind == AnamnesisKind::Pillar && p.seed_rep.is_some() { return Err(ProtocolError::InvalidParams("pillars cannot include seedRep".into())); }
+        let seed = p.seed_rep.map(|s| AnamnesisSeedRep::new(s.number, s.occurred_on, s.how_it_went, s.portal_pull, s.lighter)).transpose().map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        AnamnesisAddRequest::new(room, kind, fidelity, activation, p.title.unwrap_or_default(), p.shape, p.dormant, p.ramp.unwrap_or_default(), p.counsel, p.peak, p.beginning, p.verify_note, p.canon, p.source_paths, p.tags, p.allow_empty_cycle, seed).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+    }
+}
+impl AnamnesisWriteParams {
+    pub fn append_request(self) -> Result<AnamnesisAppendRequest, ProtocolError> {
+        if self.operation != "append-rep" { return Err(ProtocolError::InvalidParams("operation is not append-rep".into())); }
+        let room = RoomKey::for_anamnesis(self.room.ok_or_else(|| ProtocolError::InvalidParams("append-rep requires room".into()))?).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        AnamnesisAppendRequest::new(room, self.title.unwrap_or_default(), self.rep_number.unwrap_or(0), self.occurred_on, self.how_it_went.unwrap_or_default(), self.portal_pull.unwrap_or_default(), self.lighter.unwrap_or_default(), self.source_paths).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+    }
+}
+
 impl RequestEnvelope {
     pub fn remember_request(self) -> Result<RememberRequest, ProtocolError> {
         if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
         if self.method != "remember" { return Err(ProtocolError::UnknownMethod(self.method)); }
-        let params: RememberParams = serde_json::from_value(self.params)
-            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let params: RememberParams = serde_json::from_value(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         params.try_into()
     }
-
     pub fn recall_request(self) -> Result<RecallRequest, ProtocolError> {
         if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
         if self.method != "recall" { return Err(ProtocolError::UnknownMethod(self.method)); }
-        let params: RecallParams = serde_json::from_value(self.params)
-            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let params: RecallParams = serde_json::from_value(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         params.try_into()
+    }
+    pub fn anamnesis_request(self) -> Result<AnamnesisReadRequest, ProtocolError> {
+        if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
+        if self.method != "anamnesis" { return Err(ProtocolError::UnknownMethod(self.method)); }
+        serde_json::from_value::<AnamnesisParams>(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?.try_into()
+    }
+    pub fn anamnesis_add_request(self) -> Result<AnamnesisAddRequest, ProtocolError> {
+        if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
+        if self.method != "anamnesis_write" { return Err(ProtocolError::UnknownMethod(self.method)); }
+        serde_json::from_value::<AnamnesisWriteParams>(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?.try_into()
+    }
+    pub fn anamnesis_append_request(self) -> Result<AnamnesisAppendRequest, ProtocolError> {
+        if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
+        if self.method != "anamnesis_write" { return Err(ProtocolError::UnknownMethod(self.method)); }
+        serde_json::from_value::<AnamnesisWriteParams>(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?.append_request()
     }
     pub fn parse_line(line: &str) -> Result<Self, ProtocolError> {
         serde_json::from_str(line).map_err(|e| ProtocolError::Malformed(e.to_string()))
@@ -333,6 +417,46 @@ impl From<RememberReceipt> for RememberResult {
 pub fn success<T>(id: impl Into<String>, result: T) -> ResponseEnvelope<T> {
     ResponseEnvelope { protocol: PROTOCOL_VERSION, id: id.into(), payload: ResponsePayload::Result { result } }
 }
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnamnesisResult {
+    pub ok: bool,
+    pub mode: String,
+    pub room: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    pub found: bool,
+    #[serde(default)]
+    pub entries: Vec<Value>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnamnesisWriteResult {
+    pub ok: bool,
+    pub operation: String,
+    pub room: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rep_number: Option<u32>,
+    pub durable: bool,
+    pub authority: String,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+impl From<AnamnesisReceipt> for AnamnesisWriteResult {
+    fn from(r: AnamnesisReceipt) -> Self { Self { ok: true, operation: "add".into(), room: r.room().to_string(), title: Some(r.title().into()), kind: Some(r.kind().as_str().into()), rep_number: None, durable: r.durable(), authority: "postgres".into(), warnings: r.warnings().to_vec() } }
+}
+impl From<AnamnesisAppendReceipt> for AnamnesisWriteResult {
+    fn from(r: AnamnesisAppendReceipt) -> Self { Self { ok: true, operation: "append-rep".into(), room: r.room().to_string(), title: Some(r.title().into()), kind: None, rep_number: Some(r.rep_number()), durable: r.durable(), authority: "postgres".into(), warnings: r.warnings().to_vec() } }
+}
+pub type AnamnesisReadResult = AnamnesisResult;
+pub type AnamnesisReceiptResult = AnamnesisWriteResult;
+
 
 pub fn error<T>(id: impl Into<String>, error: ProtocolError) -> ResponseEnvelope<T> {
     ResponseEnvelope { protocol: PROTOCOL_VERSION, id: id.into(), payload: ResponsePayload::Error { error: error.into() } }
@@ -349,6 +473,23 @@ mod tests {
         assert_eq!(request.remember_request().unwrap().room().as_str(), "lab");
         let json = serde_json::to_string(&success("x", RememberResult { memory_id: 4, room: "lab".into(), source_path: "mem.md".into(), lesson_id: None, kind: None, durable: true, authority: "postgres".into(), warnings: vec![] })).unwrap();
         assert_eq!(json, r#"{"protocol":1,"id":"x","result":{"memory_id":4,"room":"lab","source_path":"mem.md","durable":true,"authority":"postgres","warnings":[]}}"#);
+    }
+
+    #[test]
+    fn anamnesis_accepts_house_and_preserves_query_in_exact_result_json() {
+        let request = RequestEnvelope::parse_line(
+            r#"{"protocol":1,"id":"a","method":"anamnesis","params":{"room":"house","mode":"consult","query":"needle"}}"#,
+        ).unwrap();
+        let parsed = request.anamnesis_request().unwrap();
+        assert_eq!(parsed.room().as_str(), "house");
+        assert_eq!(parsed.query(), Some("needle"));
+        let json = serde_json::to_string(&success("a", AnamnesisResult {
+            ok: true, mode: "consult".into(), room: "house".into(), query: Some("needle".into()),
+            found: true, entries: vec![serde_json::json!({"title":"T"})], warnings: vec![],
+        })).unwrap();
+        assert_eq!(json, r#"{"protocol":1,"id":"a","result":{"ok":true,"mode":"consult","room":"house","query":"needle","found":true,"entries":[{"title":"T"}],"warnings":[]}}"#);
+        let remember = RequestEnvelope { protocol: 1, id: "r".into(), method: "remember".into(), params: serde_json::json!({"room":"house","kind":"memory","title":"T","body":"B"}) };
+        assert!(remember.remember_request().is_err());
     }
 
 
