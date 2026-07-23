@@ -29,6 +29,20 @@ pub struct RememberParams {
     pub threads: Vec<String>,
     #[serde(default)]
     pub supersedes: Vec<String>,
+    #[serde(default)]
+    pub shape: Option<String>,
+    #[serde(default)]
+    pub voice: Option<String>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub project: Option<String>,
+    #[serde(default, rename = "proofPattern")]
+    pub proof_pattern: Option<String>,
+    #[serde(default, rename = "triggerContext")]
+    pub trigger_context: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
     #[serde(default = "default_backup")]
     pub backup: bool,
 }
@@ -126,16 +140,80 @@ pub struct ProtocolErrorBody {
     pub details: Option<Value>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct RememberResult {
+    #[serde(skip_serializing_if = "is_zero")]
     pub memory_id: u64,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub room: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub source_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lesson_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
     pub durable: bool,
     pub authority: String,
     pub warnings: Vec<String>,
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RememberResultWire {
+    #[serde(default)]
+    memory_id: Option<u64>,
+    #[serde(default)]
+    room: Option<String>,
+    #[serde(default)]
+    source_path: Option<String>,
+    #[serde(default)]
+    lesson_id: Option<u64>,
+    #[serde(default)]
+    kind: Option<String>,
+    durable: Option<bool>,
+    authority: Option<String>,
+    warnings: Option<Vec<String>>,
+}
+
+impl<'de> Deserialize<'de> for RememberResult {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = RememberResultWire::deserialize(deserializer)?;
+        let has_memory = wire.memory_id.is_some() || wire.room.is_some() || wire.source_path.is_some();
+        let has_lesson = wire.lesson_id.is_some() || wire.kind.is_some();
+        let durable = wire.durable.ok_or_else(|| D::Error::missing_field("durable"))?;
+        let authority = wire.authority.ok_or_else(|| D::Error::missing_field("authority"))?;
+        let warnings = wire.warnings.ok_or_else(|| D::Error::missing_field("warnings"))?;
+        match (has_memory, has_lesson) {
+            (true, true) => Err(D::Error::custom("memory and lesson receipt fields cannot be mixed")),
+            (true, false) => Ok(Self {
+                memory_id: wire.memory_id.ok_or_else(|| D::Error::missing_field("memory_id"))?,
+                room: wire.room.ok_or_else(|| D::Error::missing_field("room"))?,
+                source_path: wire.source_path.ok_or_else(|| D::Error::missing_field("source_path"))?,
+                lesson_id: None,
+                kind: None,
+                durable,
+                authority,
+                warnings,
+            }),
+            (false, true) => Ok(Self {
+                memory_id: 0,
+                room: String::new(),
+                source_path: String::new(),
+                lesson_id: Some(wire.lesson_id.ok_or_else(|| D::Error::missing_field("lesson_id"))?),
+                kind: Some(wire.kind.ok_or_else(|| D::Error::missing_field("kind"))?),
+                durable,
+                authority,
+                warnings,
+            }),
+            (false, false) => Err(D::Error::custom("receipt must contain memory or lesson fields")),
+        }
+    }
+}
+
+fn is_zero(value: &u64) -> bool { *value == 0 }
 
 impl TryFrom<RecallParams> for RecallRequest {
     type Error = ProtocolError;
@@ -191,6 +269,12 @@ impl TryFrom<RememberParams> for RememberRequest {
     fn try_from(params: RememberParams) -> Result<Self, Self::Error> {
         let room = RoomKey::new(params.room).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         let kind = RememberKind::parse(&params.kind).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        if kind.is_lesson() && (params.source_path.is_some() || !params.threads.is_empty() || !params.supersedes.is_empty()) {
+            return Err(ProtocolError::InvalidParams("memory-only fields are not valid for lessons".into()));
+        }
+        if !kind.is_lesson() && (params.shape.is_some() || params.voice.is_some() || params.scope.is_some() || params.project.is_some() || params.proof_pattern.is_some() || params.trigger_context.is_some() || !params.tags.is_empty()) {
+            return Err(ProtocolError::InvalidParams("lesson-only fields are not valid for memory".into()));
+        }
         let mut supersedes = Vec::with_capacity(params.supersedes.len());
         for raw in params.supersedes {
             let id = raw.parse::<i64>().ok().filter(|&id| id > 0).ok_or_else(|| {
@@ -198,8 +282,15 @@ impl TryFrom<RememberParams> for RememberRequest {
             })? as u64;
             if !supersedes.contains(&id) { supersedes.push(id); }
         }
-        RememberRequest::new(room, kind, params.title, params.body, params.source_path, params.threads, supersedes, params.backup)
-            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+        let result = if kind.is_lesson() {
+            RememberRequest::new_lesson(room, kind, params.title, params.body, params.backup,
+                params.shape, params.voice, params.scope, params.project, params.proof_pattern,
+                params.trigger_context, params.tags)
+        } else {
+            RememberRequest::new(room, kind, params.title, params.body, params.source_path,
+                params.threads, supersedes, params.backup)
+        };
+        result.map_err(|e| ProtocolError::InvalidParams(e.to_string()))
     }
 }
 
@@ -219,7 +310,6 @@ impl RequestEnvelope {
             .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         params.try_into()
     }
-
     pub fn parse_line(line: &str) -> Result<Self, ProtocolError> {
         serde_json::from_str(line).map_err(|e| ProtocolError::Malformed(e.to_string()))
     }
@@ -227,7 +317,16 @@ impl RequestEnvelope {
 
 impl From<RememberReceipt> for RememberResult {
     fn from(receipt: RememberReceipt) -> Self {
-        Self { memory_id: receipt.memory_id(), room: receipt.room().to_string(), source_path: receipt.source_path().to_owned(), durable: true, authority: "postgres".into(), warnings: receipt.warnings().to_vec() }
+        Self {
+            memory_id: receipt.memory_id(),
+            room: if receipt.kind().is_lesson() { String::new() } else { receipt.room().to_string() },
+            source_path: if receipt.kind().is_lesson() { String::new() } else { receipt.source_path().to_owned() },
+            lesson_id: (receipt.lesson_id() != 0).then_some(receipt.lesson_id()),
+            kind: receipt.kind().is_lesson().then(|| receipt.kind().as_str().to_owned()),
+            durable: receipt.durable(),
+            authority: "postgres".into(),
+            warnings: receipt.warnings().to_vec(),
+        }
     }
 }
 
@@ -248,10 +347,35 @@ mod tests {
         let line = r#"{"protocol":1,"id":"x","method":"remember","params":{"room":"lab","kind":"memory","title":"T","body":"B","backup":true}}"#;
         let request = RequestEnvelope::parse_line(line).unwrap();
         assert_eq!(request.remember_request().unwrap().room().as_str(), "lab");
-        let json = serde_json::to_string(&success("x", RememberResult { memory_id: 4, room: "lab".into(), source_path: "mem.md".into(), durable: true, authority: "postgres".into(), warnings: vec![] })).unwrap();
+        let json = serde_json::to_string(&success("x", RememberResult { memory_id: 4, room: "lab".into(), source_path: "mem.md".into(), lesson_id: None, kind: None, durable: true, authority: "postgres".into(), warnings: vec![] })).unwrap();
         assert_eq!(json, r#"{"protocol":1,"id":"x","result":{"memory_id":4,"room":"lab","source_path":"mem.md","durable":true,"authority":"postgres","warnings":[]}}"#);
     }
 
+
+    #[test]
+    fn remember_result_deserializes_memory_and_lesson_receipts_without_hybrids() {
+        let memory: RememberResult = serde_json::from_value(serde_json::json!({
+            "memory_id": 4, "room": "lab", "source_path": "mem.md",
+            "durable": true, "authority": "postgres", "warnings": []
+        })).unwrap();
+        assert_eq!(memory.memory_id, 4);
+        assert_eq!(memory.lesson_id, None);
+
+        let lesson: RememberResult = serde_json::from_value(serde_json::json!({
+            "lesson_id": 9, "kind": "coding-lesson",
+            "durable": true, "authority": "postgres", "warnings": []
+        })).unwrap();
+        assert_eq!(lesson.lesson_id, Some(9));
+        assert_eq!(lesson.kind.as_deref(), Some("coding-lesson"));
+        assert_eq!(lesson.memory_id, 0);
+
+        let hybrid = serde_json::json!({
+            "memory_id": 4, "room": "lab", "source_path": "mem.md",
+            "lesson_id": 9, "kind": "coding-lesson",
+            "durable": true, "authority": "postgres", "warnings": []
+        });
+        assert!(serde_json::from_value::<RememberResult>(hybrid).is_err());
+    }
     #[test]
     fn rejects_mismatch_malformed_unknown_and_bad_param_shape() {
         let mismatch = RequestEnvelope { protocol: 2, id: "x".into(), method: "remember".into(), params: Value::Null };
@@ -279,13 +403,13 @@ mod tests {
 
     #[test]
     fn supersedes_strings_are_positive_postgres_bigints_and_deduplicated() {
-        let params = RememberParams { room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], supersedes: vec!["41".into(), "42".into(), "41".into()], backup: true };
+        let params = RememberParams { room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], supersedes: vec!["41".into(), "42".into(), "41".into()], shape: None, voice: None, scope: None, project: None, proof_pattern: None, trigger_context: None, tags: vec![], backup: true };
         assert_eq!(RememberRequest::try_from(params).unwrap().supersedes(), &[41, 42]);
         let max = i64::MAX.to_string();
-        let params = RememberParams { supersedes: vec![max], room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], backup: true };
+        let params = RememberParams { supersedes: vec![max], room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], shape: None, voice: None, scope: None, project: None, proof_pattern: None, trigger_context: None, tags: vec![], backup: true };
         assert_eq!(RememberRequest::try_from(params).unwrap().supersedes(), &[i64::MAX as u64]);
         for bad in ["0", "9223372036854775808", "nope"] {
-            let params = RememberParams { supersedes: vec![bad.into()], room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], backup: true };
+            let params = RememberParams { supersedes: vec![bad.into()], room: "lab".into(), kind: "memory".into(), title: "T".into(), body: "B".into(), source_path: None, threads: vec![], shape: None, voice: None, scope: None, project: None, proof_pattern: None, trigger_context: None, tags: vec![], backup: true };
             assert!(matches!(RememberRequest::try_from(params), Err(ProtocolError::InvalidParams(_))));
         }
     }
@@ -330,5 +454,27 @@ mod tests {
         assert!(base(unknown).recall_request().is_err());
         let wrong = RequestEnvelope { protocol: 1, id: "r".into(), method: "other".into(), params: serde_json::json!({}) };
         assert!(matches!(wrong.recall_request(), Err(ProtocolError::UnknownMethod(_))));
+    }
+    #[test]
+    fn all_lesson_kinds_validate_defaults_and_receipt_shape() {
+        for kind in ["coding-lesson", "project-lesson", "writing-lesson", "audio-lesson"] {
+            let mut params = serde_json::json!({"room":"lab","kind":kind,"title":"T","body":"B"});
+            if kind == "project-lesson" { params["project"] = serde_json::json!("app"); }
+            let request = RequestEnvelope { protocol: 1, id: "l".into(), method: "remember".into(), params };
+            let parsed = request.remember_request().unwrap();
+            assert_eq!(parsed.kind().as_str(), kind);
+            let receipt = RememberReceipt::committed_lesson(9, parsed.kind(), RoomKey::new("lab").unwrap(), vec![]).unwrap();
+            let json = serde_json::to_string(&success("l", RememberResult::from(receipt))).unwrap();
+            assert_eq!(json, format!(r#"{{"protocol":1,"id":"l","result":{{"lesson_id":9,"kind":"{kind}","durable":true,"authority":"postgres","warnings":[]}}}}"#));
+        }
+    }
+
+    #[test]
+    fn lessons_reject_memory_fields_and_require_project() {
+        let base = |params| RequestEnvelope { protocol: 1, id: "l".into(), method: "remember".into(), params };
+        assert!(base(serde_json::json!({"room":"lab","kind":"project-lesson","title":"T","body":"B"})).remember_request().is_err());
+        assert!(base(serde_json::json!({"room":"lab","kind":"coding-lesson","title":"T","body":"B","threads":["x"]})).remember_request().is_err());
+        assert!(base(serde_json::json!({"room":"lab","kind":"writing-lesson","title":"T","body":"B","project":"x"})).remember_request().is_err());
+        assert!(base(serde_json::json!({"room":"lab","kind":"memory","title":"T","body":"B","shape":"x"})).remember_request().is_err());
     }
 }
