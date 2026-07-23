@@ -21,7 +21,7 @@ pub enum Authority {
     Full,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DomainError {
     InvalidRoomKey(String),
     ReservedRoomKey,
@@ -32,6 +32,9 @@ pub enum DomainError {
     InvalidSupersedes,
     FullUnhealthy { reason: String },
     DegradedUnavailable,
+    EmptyQuery,
+    InvalidTopK { field: String, value: u32 },
+    InvalidThreshold { field: String, value: f64 },
 }
 
 impl fmt::Display for DomainError {
@@ -46,6 +49,9 @@ impl fmt::Display for DomainError {
             Self::InvalidSupersedes => f.write_str("supersedes IDs must be positive"),
             Self::FullUnhealthy { reason } => write!(f, "full authority is unhealthy: {reason}"),
             Self::DegradedUnavailable => f.write_str("degraded mode cannot durably remember"),
+            Self::EmptyQuery => f.write_str("recall query must not be empty"),
+            Self::InvalidTopK { field, value } => write!(f, "{field} must be positive and at most 1000: {value}"),
+            Self::InvalidThreshold { field, value } => write!(f, "{field} must be finite and in [0, 1]: {value}"),
         }
     }
 }
@@ -73,6 +79,55 @@ impl RoomKey {
     }
 
     pub fn as_str(&self) -> &str { &self.0 }
+}
+
+const MAX_RECALL_TOP_K: u32 = 1_000;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecallRequest {
+    room: RoomKey,
+    query: String,
+    semantic_top_k: u32,
+    semantic_min_similarity: f64,
+    content_top_k: u32,
+    content_min_similarity: f64,
+}
+
+impl RecallRequest {
+    pub fn new(
+        room: RoomKey,
+        query: String,
+        semantic_top_k: u32,
+        semantic_min_similarity: f64,
+        content_top_k: u32,
+        content_min_similarity: f64,
+    ) -> Result<Self, DomainError> {
+        if query.trim().is_empty() { return Err(DomainError::EmptyQuery); }
+        for (field, value) in [
+            ("semantic_top_k", semantic_top_k),
+            ("content_top_k", content_top_k),
+        ] {
+            if value == 0 || value > MAX_RECALL_TOP_K {
+                return Err(DomainError::InvalidTopK { field: field.into(), value });
+            }
+        }
+        for (field, value) in [
+            ("semantic_min_similarity", semantic_min_similarity),
+            ("content_min_similarity", content_min_similarity),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(DomainError::InvalidThreshold { field: field.into(), value });
+            }
+        }
+        Ok(Self { room, query, semantic_top_k, semantic_min_similarity, content_top_k, content_min_similarity })
+    }
+
+    pub fn room(&self) -> &RoomKey { &self.room }
+    pub fn query(&self) -> &str { &self.query }
+    pub const fn semantic_top_k(&self) -> u32 { self.semantic_top_k }
+    pub const fn semantic_min_similarity(&self) -> f64 { self.semantic_min_similarity }
+    pub const fn content_top_k(&self) -> u32 { self.content_top_k }
+    pub const fn content_min_similarity(&self) -> f64 { self.content_min_similarity }
 }
 
 impl fmt::Display for RoomKey {

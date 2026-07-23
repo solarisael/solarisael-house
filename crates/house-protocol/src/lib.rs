@@ -1,6 +1,6 @@
 //! Newline-delimited JSON wire protocol, version 1.
 
-use house_core::{RememberKind, RememberReceipt, RememberRequest, RoomKey};
+use house_core::{RecallRequest, RememberKind, RememberReceipt, RememberRequest, RoomKey};
 use serde::{de::{DeserializeOwned, Error as DeError}, Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
@@ -34,6 +34,54 @@ pub struct RememberParams {
 }
 
 fn default_backup() -> bool { true }
+
+fn default_semantic_top_k() -> u32 { 8 }
+fn default_semantic_min_similarity() -> f64 { 0.50 }
+fn default_content_top_k() -> u32 { 8 }
+fn default_content_min_similarity() -> f64 { 0.30 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecallParams {
+    pub room: String,
+    pub query: String,
+    #[serde(default = "default_semantic_top_k")]
+    pub semantic_top_k: u32,
+    #[serde(default = "default_semantic_min_similarity")]
+    pub semantic_min_similarity: f64,
+    #[serde(default = "default_content_top_k")]
+    pub content_top_k: u32,
+    #[serde(default = "default_content_min_similarity")]
+    pub content_min_similarity: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecallResult {
+    pub ok: bool,
+    pub query: String,
+    pub found: bool,
+    pub source: String,
+    #[serde(rename = "retrievalCandidates")]
+    pub retrieval_candidates: Vec<Value>,
+    #[serde(rename = "canonMatches")]
+    pub canon_matches: Vec<Value>,
+    #[serde(rename = "semanticChunks")]
+    pub semantic_chunks: Vec<Value>,
+    #[serde(rename = "contentChunks")]
+    pub content_chunks: Vec<Value>,
+    #[serde(rename = "dateMatches")]
+    pub date_matches: Vec<Value>,
+    #[serde(rename = "queryDates")]
+    pub query_dates: Vec<Value>,
+    pub taxonomy: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clusters: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "memoryHandle")]
+    pub memory_handle: Option<Value>,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(bound(deserialize = "T: DeserializeOwned"))]
@@ -69,6 +117,7 @@ impl<'de, T: DeserializeOwned> Deserialize<'de> for ResponsePayload<T> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ProtocolErrorBody {
     pub code: String,
     pub message: String,
@@ -78,6 +127,7 @@ pub struct ProtocolErrorBody {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct RememberResult {
     pub memory_id: u64,
     pub room: String,
@@ -85,6 +135,23 @@ pub struct RememberResult {
     pub durable: bool,
     pub authority: String,
     pub warnings: Vec<String>,
+}
+
+impl TryFrom<RecallParams> for RecallRequest {
+    type Error = ProtocolError;
+
+    fn try_from(params: RecallParams) -> Result<Self, Self::Error> {
+        let room = RoomKey::new(params.room)
+            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        RecallRequest::new(
+            room,
+            params.query,
+            params.semantic_top_k,
+            params.semantic_min_similarity,
+            params.content_top_k,
+            params.content_min_similarity,
+        ).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,6 +208,14 @@ impl RequestEnvelope {
         if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
         if self.method != "remember" { return Err(ProtocolError::UnknownMethod(self.method)); }
         let params: RememberParams = serde_json::from_value(self.params)
+            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        params.try_into()
+    }
+
+    pub fn recall_request(self) -> Result<RecallRequest, ProtocolError> {
+        if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
+        if self.method != "recall" { return Err(ProtocolError::UnknownMethod(self.method)); }
+        let params: RecallParams = serde_json::from_value(self.params)
             .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         params.try_into()
     }
@@ -221,5 +296,39 @@ mod tests {
         let neither = r#"{"protocol":1,"id":"x"}"#;
         assert!(serde_json::from_str::<ResponseEnvelope<Value>>(both).is_err());
         assert!(serde_json::from_str::<ResponseEnvelope<Value>>(neither).is_err());
+    }
+    #[test]
+    fn recall_defaults_validate_and_round_trip() {
+        let request = RequestEnvelope::parse_line(
+            r#"{"protocol":1,"id":"r","method":"recall","params":{"room":"lab","query":"alpha"}}"#,
+        ).unwrap();
+        let recall = request.recall_request().unwrap();
+        assert_eq!(recall.semantic_top_k(), 8);
+        assert_eq!(recall.semantic_min_similarity(), 0.50);
+        assert_eq!(recall.content_top_k(), 8);
+        assert_eq!(recall.content_min_similarity(), 0.30);
+
+        let params: RecallParams = serde_json::from_value(serde_json::json!({"room":"lab","query":"alpha"})).unwrap();
+        assert_eq!(serde_json::to_string(&params).unwrap(),
+            r#"{"room":"lab","query":"alpha","semantic_top_k":8,"semantic_min_similarity":0.5,"content_top_k":8,"content_min_similarity":0.3}"#);
+    }
+
+    #[test]
+    fn recall_rejects_bounds_nonfinite_unknown_fields_and_methods() {
+        let base = |params| RequestEnvelope { protocol: 1, id: "r".into(), method: "recall".into(), params };
+        for key in ["semantic_top_k", "content_top_k"] {
+            let mut value = serde_json::json!({"room":"lab","query":"x"});
+            value[key] = serde_json::json!(0);
+            assert!(matches!(base(value).recall_request(), Err(ProtocolError::InvalidParams(_))));
+        }
+        let mut value = serde_json::json!({"room":"lab","query":"x"});
+        value["semantic_min_similarity"] = serde_json::json!(1.1);
+        assert!(base(value).recall_request().is_err());
+        let params = RecallParams { room: "lab".into(), query: "x".into(), semantic_top_k: 8, semantic_min_similarity: f64::NAN, content_top_k: 8, content_min_similarity: 0.3 };
+        assert!(RecallRequest::try_from(params).is_err());
+        let unknown = serde_json::json!({"room":"lab","query":"x","extra":true});
+        assert!(base(unknown).recall_request().is_err());
+        let wrong = RequestEnvelope { protocol: 1, id: "r".into(), method: "other".into(), params: serde_json::json!({}) };
+        assert!(matches!(wrong.recall_request(), Err(ProtocolError::UnknownMethod(_))));
     }
 }
