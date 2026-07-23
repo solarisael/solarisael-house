@@ -1,12 +1,158 @@
 # Solarisael House Roadmap
 
-_Last updated: 2026-07-18_
+_Last updated: 2026-07-22_
 
 ## Product rule
 
 Solarisael House should work light, get sharper with Postgres, get semantic with pgvector, and optionally grow into BM25 or external search.
 
 Magic is allowed. Magic is not a boot requirement.
+
+## Release path
+
+This order is deliberate. Finish the durable runtime, prove the product, then
+make it easy to enter. Do not let later interface ideas postpone evidence and
+public explanation.
+
+### 0.8.x — operational late beta
+
+House already works end to end and carries real daily continuity:
+
+- persistent rooms and identity
+- restart continuity
+- deliberate memory writes
+- automatic and explicit recall
+- PostgreSQL, pgvector, and local Nemotron embeddings in Full mode
+- typed memory and lesson stores
+- correction and supersession
+- retrieval provenance and authority state
+- active external installations beyond the developer's machine
+
+The remaining weakness at this stage is not whether House works. It is the
+developer-shaped installation path, the pre-Rust implementation split, and
+insufficient public evidence for the full set of claims.
+
+### 0.9.0 — verified Rust cutover
+
+Complete the bounded Rust migration before expanding the product surface:
+
+- preserve Base and Full behavior across the cutover
+- migrate existing rooms and PostgreSQL data without continuity loss
+- verify storage, adapter, retrieval, and lifecycle contracts
+- keep the model provider and harness behind replaceable boundaries
+- retain fail-open behavior where retrieval must not block a conversation
+- publish the exact compatibility and migration boundary
+
+Rust is a distribution and reliability decision, not a reason to rewrite
+appropriate UI adapters, evaluation scripts, or research tooling.
+
+### 0.9.x — proof and visibility
+
+After the Rust cutover, pause infrastructure expansion long enough to make the
+existing product legible.
+
+The root README becomes a concise, compression-resistant spine:
+
+1. one-sentence definition
+2. the problem House solves
+3. verified current features
+4. a compact evidence table
+5. one architecture diagram
+6. Base versus Full
+7. one deterministic next action
+8. links to detailed documents
+
+Long methodological qualifications belong in linked evidence, limitations,
+installation, and security documents. They remain discoverable without
+controlling the first-contact interpretation of every feature.
+
+Expand public evidence beyond the favorable exact-title pilot:
+
+- restart continuity
+- paraphrase and entity recall
+- correction and supersession authority
+- cross-room isolation
+- recall latency at stated corpus sizes and hardware
+- clean-machine installation
+- migration, backup, and recovery
+- final-answer grounding against retrieved evidence
+
+Every public result names its method, fixture or corpus, hardware, date,
+limitations, and sanitized artifact. Public demonstrations use a sterile
+synthetic House; private room, relationship, family, and company continuity
+never becomes demo material.
+
+Ship a short presentation, a reproducible live demonstration, and public posts
+from the same evidence package. GUI, avatars, marketplace work, organizational
+imports, and perfect installers do not block this phase.
+
+### 1.0.0 — supported ordinary-user installation
+
+The first stable product contract includes:
+
+- a small trusted native bootstrapper
+- AI-guided contextual setup after the bootstrapper establishes a foothold
+- explicit provider authentication
+- Base or Full selection
+- health checks and a real lifecycle smoke test
+- safe upgrades and uninstall behavior
+- memory-preserving migrations
+- backup and recovery
+- stable adapter and data contracts
+- one documented supported deployment topology
+
+The bootstrapper owns deterministic machine changes. The AI owns the flexible
+parts of onboarding. Ordinary users should not need to manually create the
+starting folder, install a terminal, assemble WSL dependencies, or understand
+the substrate before House can help them.
+
+### After 1.0 — broader product surface
+
+#### Thin GUI
+
+Provide a familiar chat interface that controls a harness through canonical
+commands and structured events. It should expose rooms, active spirits, tools,
+permissions, recall, and health without replacing the harness or scraping ANSI
+terminal output. Keep an explicit terminal escape hatch.
+
+#### Embodiment and creator ecosystem
+
+Keep spirit identity and memory separate from replaceable presentation bodies.
+Support avatar, expression, animation, voice, and room packages through a
+manifested and sandboxed asset format. Cosmetic assets and executable tool
+extensions require different trust and permission lanes.
+
+#### Organizational House
+
+Support a central multi-user deployment with:
+
+- tenant, team, project, and private-user scopes
+- authorization filtering before relevance ranking
+- source provenance, versions, checksums, and authority classes
+- retention and deliberate-forgetting policies
+- auditability and administrative controls
+- harness, chat, IDE, and knowledge-tool adapters over the same continuity
+
+Existing governed workspaces enter through generic import profiles, not
+workspace-specific branches in core. A profile maps governance to project
+lessons and policies; skills to canonical methods; knowledge to typed source
+documents, entities, memories, and decisions; deliverables to authoritative
+artifacts; repositories to isolated project connectors; and local, temporary,
+or archived material to explicit exclusion and retention rules.
+
+Import begins in mirror mode with original sources still authoritative. After
+paths, precedence, isolation, exclusions, and retrieval are verified, an
+operator may choose House as the coordinating PostgreSQL authority. Git remains
+authoritative for code, and human-readable tools such as Obsidian may remain
+interfaces or synchronized projections.
+
+#### Honest commercial boundary
+
+Self-hosting and the core may remain free while paid offerings provide painless
+installation, updates, backups, hosting, organizational governance, support,
+and marketplace services. Payment buys service and convenience, never custody
+of a user's continuity. Memories and identities remain exportable and
+provider-portable.
 
 ## Current goals
 

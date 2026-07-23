@@ -1,201 +1,124 @@
 # Solarisael House
 
-A local-first continuity and memory system for AI companions, work partners, and long-running agents.
+Solarisael House is a local-first continuity and memory system for AI companions, work partners, and long-running agents.
 
-## Why
+Sessions end. Models and providers change. Context windows fill. Solarisael House keeps identity, decisions, corrections, relationships, and project history outside any one model session so an agent can return with the evidence needed to continue.
 
-AI work and relationships happen through sessions that end. Models change. Providers change. Context windows fill. Summaries lose detail.
+**Status: 0.8.x operational late beta.** House runs daily, carries real rooms, and has external installations. The Rust cutover leads to 0.9; supported ordinary-user installation defines 1.0.
 
-These limits cause repeated introductions, lost decisions, stale corrections, duplicated research, and inconsistent work. A model can sound informed without the evidence to continue correctly.
+## What House changes
 
-Solarisael House keeps continuity outside one model session. The operator owns the room and its history.
+Without durable continuity, every new session spends context reconstructing the past. Summaries flatten detail, stale statements survive corrections, and important decisions disappear into old transcripts.
 
-The room separates stable identity, current state, recent context, and deep memory. A new agent can recover the needed evidence without loading the full archive.
+House gives the operator a persistent room with separate layers for identity, current state, recent context, and deep memory. It retrieves only the evidence relevant to the current turn, preserves where that evidence came from, and keeps changed truths from competing forever with the record they replaced.
 
-For work, the House keeps project decisions, conventions, corrections, and handoffs available. Agents spend more context on the task and less context rebuilding the workspace.
+For work, House carries project decisions, conventions, lessons, corrections, and handoffs across sessions and harnesses.
 
-For relationships, the House keeps identity and shared history available across restarts. A provider or model change does not erase the room.
+For relationships, House carries identity and shared history across restarts, model changes, and provider changes. The room belongs to the operator, not to one model endpoint.
 
-## Features
+## Capabilities
 
-The table names both the user feature and its implementation.
-
-| Feature | Mode | Technical implementation |
-|---|---|---|
-| Persistent rooms | Base | Room-local Markdown and JSON files, `AGENTS.md`, `active_spirit.md`, and `.solarisael-room.json` |
-| Restart continuity | Base | OMP lifecycle hooks, room-local conversation logs, and compact context files |
-| Separate context layers | Base | Identity files, room state, recent context, and archive paths remain separate |
-| Multiple rooms | Base | Working-directory discovery, stable room keys, room-scoped paths, and private memory scope |
-| Adapter runtime | Base | TypeScript extensions run through Bun and the OMP extension API |
-| Memory lifecycle tools | Full | OMP tools call the Python substrate for `remember`, `recall`, `sleep`, and `wake` |
-| Hybrid retrieval | Full | PostgreSQL full-text search, `pgvector`, direct content search, entities, dates, threads, taxonomy, and clusters |
-| Embedding choice | Full | Use any compatible Ollama or OpenAI-style embedding endpoint |
-| Tested embedding default | Full | Ollama serves `qwen3-embedding:4b` vectors with 2,560 dimensions |
-| Vector rebuilds | Full | Rebuild all memory vectors, lesson vectors, and `pgvector` indexes at any time |
-| Vector compatibility | Full | Use one vector space for indexing and recall; migrate the database column before a dimension change |
-| Evidence viewport | Full | Ranked bundles include source provenance, authority state, selection reasons, and suppression diagnostics |
-| Corrections | Full | Supersession removes stale authority while PostgreSQL keeps the historical row |
-| Typed stores | Full | Separate PostgreSQL tables hold memories, coding lessons, project lessons, writing lessons, and audio lessons |
-| Installation checks | Base | `verify-install.ts`, `room_state`, a fresh room session, and a restart continuity test |
-| Substrate checks | Full | `health.py`, a real memory write and read, and a lifecycle smoke test |
-| Health states | Base and Full | Checks report Base, Full, or configured-but-degraded |
-
-## Choose how to use this repository
-
-### Understand the project
-
-Use this mode when you want an explanation before installation.
-
-If you are the operator, send this request:
-
-> Read Solarisael House as a product and architecture guide. Explain its purpose, features, modes, data flow, privacy boundaries, and tradeoffs. Do not install or change anything.
-
-If you are the AI agent, read this README first. Then read [`USAGE.md`](./USAGE.md) for workflows and [`HOUSE.md`](./HOUSE.md) for design reasons.
-
-Explain Base House and Full House separately. Name the repository that owns each system part. Separate verified behavior from planned work.
-
-### Install the project
-
-> [!IMPORTANT]
-> Give this repository to a tool-capable AI agent. The agent performs the installation with the operator.
-
-If you are the operator, send this request:
-
-> Install Solarisael House with me. Preserve my rooms and configuration. Explain important choices before you make changes. Verify the result.
-
-If you are the AI agent, read [`INSTALL.md`](./INSTALL.md) before you change the host. Read [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) before you edit an identity.
-
-### Rules for the installing agent
-
-1. Inspect the operating system, AI harness, existing rooms, configuration, runtime, and database support.
-2. Ask the operator which continuity features they want.
-3. Choose Base House or Full House from those requirements.
-4. Report configured-but-degraded when the Full House requirements fail.
-5. Preserve all existing rooms and unrelated configuration.
-6. Explain any elevation, deletion, or global change before you run it.
-7. Use additive configuration changes.
-8. Run each required verification step.
-9. Report only the features that the checks prove.
-
-Do not replace House memory with harness memory. The systems can work together, but they do not provide the same contracts.
-
-## Repository map
-
-Keep these repositories as sibling directories unless the installation guide specifies another path.
-
-| Repository | Purpose |
-|---|---|
-| [`solarisael-house`](https://github.com/solarisael/solarisael-house) | Core contracts, shared logic, and documentation |
-| [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp) | Recommended OMP adapter, starter room, and installation checks |
-| [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) | Optional Full House database, local embeddings, memory tools, and backups |
-
-This repository does not contain the OMP adapter or the Full House database. Use the repository that owns each part.
-
-## Choose a mode
-
-Base House and Full House are complete deployment modes. Full House is not a required upgrade from Base House.
-
-| Capability | Base House | Full House |
+| Capability | Base | Full |
 |---|:---:|:---:|
-| Stable identity and room state | Yes | Yes |
-| File-based session continuity | Yes | Yes |
-| Recovery after a restart | Yes | Yes |
-| PostgreSQL memory authority | No | Yes |
-| Local semantic search | No | Yes |
-| Hybrid memory retrieval | No | Yes |
-| Typed memory and lesson stores | No | Yes |
-| Correction and supersession support | Limited | Yes |
-| Entity, date, and cluster retrieval | No | Yes |
+| Persistent rooms and identity contracts | Yes | Yes |
+| Restart continuity and room-local context | Yes | Yes |
+| Multiple isolated rooms | Yes | Yes |
+| Conversation logging and compact handoffs | Yes | Yes |
+| PostgreSQL memory authority | — | Yes |
+| Hybrid lexical, content, structured, and semantic retrieval | — | Yes |
+| Local embeddings through a compatible endpoint | — | Yes |
+| Memories, coding lessons, project lessons, writing lessons, and audio lessons | — | Yes |
+| Entity, date, thread, taxonomy, relationship, and cluster retrieval | — | Yes |
+| Provenance, authority state, and selection reasons | — | Yes |
+| Corrections through supersession without historical deletion | Limited | Yes |
+| Memory lifecycle tools: `remember`, `recall`, `sleep`, and `wake` | — | Yes |
 
-Choose Base House for identity and file-based continuity. Choose Full House for durable database memory, local semantic search, and larger archives.
+Base House is a complete file-backed continuity system. Full House adds durable database memory, typed stores, local semantic search, and larger archives.
 
-A configured database does not prove that Full House works. Report Full House only after the required health and lifecycle checks pass.
+## Public evidence
 
-## What the House provides
+The first sanitized public retrieval pilot used 20 exact-title queries across two real rooms:
 
-### A persistent room
+| Measure | Result |
+|---|---:|
+| Target present in the retrieval viewport | **19/20 — 95%** |
+| Target ranked first | **16/20 — 80%** |
 
-Each room has one stable key, one identity contract, private state, and its own memory scope. The room remains available after a session ends.
+The full method, scope, and next evaluation contracts live in [`EVIDENCE.md`](./EVIDENCE.md). The sanitized artifact is published in the OMP adapter repository: [`2026-07-22-room-retrieval-pilot.json`](https://github.com/solarisael/solarisael-house-omp/blob/main/evals/2026-07-22-room-retrieval-pilot.json).
 
-### Layered context
-
-The House keeps stable identity separate from current state, recent context, and deep memory. This structure keeps the startup context small.
-
-### Evidence-based recall
-
-Full House can search text, vectors, content, entities, dates, threads, relationships, clusters, and lessons. Each result includes its source and authority state.
-
-A missing viewport does not prove that a memory is absent. The retrieval report shows selected evidence, suppressed evidence, and the inspected candidate pool.
-
-### Corrections without erasure
-
-A correction can remove authority from an old memory without deleting its history. Supersession keeps the record and selects the current account.
-
-### Tools for the memory lifecycle
-
-The House provides tools for these actions:
-
-- `remember` records durable memory.
-- `recall` finds relevant evidence.
-- `sleep` writes a session handoff.
-- `wake` reads the latest handoff.
-- Room tools read or update room state.
-- Lesson tools read or update reusable guidance.
-
-The normal lifecycle is:
+## Architecture
 
 ```text
-remember → recall → sleep → wake
+AI harness
+    │
+    ▼
+harness adapter
+    │
+    ├── room discovery, lifecycle hooks, tools
+    │
+    ▼
+Solarisael House core
+    │
+    ├── identity and room contracts
+    ├── continuity and retrieval orchestration
+    ├── ranking, authority, and worker-routing contracts
+    │
+    ├──────── Base ──────── room-local files
+    │
+    └──────── Full ──────── PostgreSQL + pgvector + embeddings
 ```
 
-Memory writes remain deliberate by default. The operator and agent choose what becomes durable.
+The implementation is split by responsibility:
 
-## Public retrieval evidence
+| Repository | Owns |
+|---|---|
+| [`solarisael-house`](https://github.com/solarisael/solarisael-house) | Core contracts, shared behavior, and canonical documentation |
+| [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp) | Recommended OMP adapter, starter room, verifier, and portable distribution |
+| [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) | Full House database, migrations, embeddings, memory tools, health, and backups |
 
-A public pilot used 20 exact-title queries across two rooms. The pilot found the target in 19 viewports and ranked 16 targets first.
+Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) for components, data flow, authority, and extension boundaries.
 
-- Viewport recall: **95%**.
-- Top-1 recall: **80%**.
+## Install
 
-This pilot tests favorable phrase matching. It does not test paraphrases or final answer quality.
+The tested path is Windows 10/11 with OMP and Bun. Full House adds the public substrate and its PostgreSQL, pgvector, Python, WSL 2, and embedding requirements.
 
-Read the sanitized [`pilot artifact`](https://github.com/solarisael/solarisael-house-omp/blob/main/evals/2026-07-22-room-retrieval-pilot.json). The artifact contains no private prompts, memory titles, source paths, excerpts, or raw telemetry.
+Give this repository to a tool-capable AI agent with:
 
-## Support and requirements
+> Install Solarisael House with me. Preserve my existing rooms and configuration, explain consequential system changes before making them, and verify the completed installation.
 
-The tested installation path uses Windows 10 or 11, OMP, and Bun. Base House does not require a database or GPU.
+The installing agent follows [`INSTALL.md`](./INSTALL.md). Platform boundaries and current non-goals live in [`LIMITATIONS.md`](./LIMITATIONS.md).
 
-Full House adds these requirements:
+## Daily use
 
-- PostgreSQL with `pgvector`.
-- Python 3.
-- A local embedding endpoint.
-- Approximately 10 GB of free storage.
-- WSL 2 with Ubuntu for the guided Windows setup.
+A normal session is simple:
 
-The tested embedding model is `qwen3-embedding:4b` through Ollama. CPU embeddings work, but they run more slowly.
+```text
+enter the room → work or live together → remember what matters → leave a paper boat
+```
 
-Native Linux can require adapter changes and separate verification. The guided installation does not support macOS.
+- `recall` retrieves older evidence.
+- `remember` records durable events, decisions, or lessons.
+- `sleep` leaves a compact handoff for the next session.
+- `wake` catches the latest handoff.
 
-An OpenCode adapter exists. The OMP installation guide does not configure or verify OpenCode.
-
-## Privacy
-
-The operator keeps private room data on the local machine. Local embeddings keep the memory archive out of a hosted embedding service.
-
-A model provider can receive any context that the agent sends in a prompt. Review provider terms before you send private material.
-
-Do not publish raw turns, memory titles, source paths, entities, threads, or private retrieval results. Publish only censored totals and non-identifying failure groups.
+Read [`USAGE.md`](./USAGE.md) for the everyday workflow.
 
 ## Documentation
 
 | Document | Purpose |
 |---|---|
-| [`INSTALL.md`](./INSTALL.md) | Installation steps and verification |
-| [`USAGE.md`](./USAGE.md) | Daily use and memory workflows |
-| [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) | Identity and room design |
-| [`HOUSE.md`](./HOUSE.md) | Project history and design reasons |
-| [`docs/roadmap.md`](./docs/roadmap.md) | Planned work |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Components, contracts, data flow, and repository ownership |
+| [`INSTALL.md`](./INSTALL.md) | Supported installation and observable verification |
+| [`USAGE.md`](./USAGE.md) | Everyday memory, room, sleep, and wake workflows |
+| [`EVIDENCE.md`](./EVIDENCE.md) | Public evaluations, results, methods, and planned proof |
+| [`LIMITATIONS.md`](./LIMITATIONS.md) | Platform boundaries, current constraints, and non-goals |
+| [`SECURITY.md`](./SECURITY.md) | Privacy, secrets, permissions, and publication rules |
+| [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) | Co-authoring rooms, identities, and active spirits |
+| [`docs/RETRIEVAL.md`](./docs/RETRIEVAL.md) | Recall lanes, authority, automatic retrieval, and corrections |
+| [`docs/LESSONS.md`](./docs/LESSONS.md) | Typed lesson stores, fields, scopes, imports, updates, and deletion |
+| [`HOUSE.md`](./HOUSE.md) | Project history, philosophy, and design reasons |
+| [`docs/roadmap.md`](./docs/roadmap.md) | Release sequence and future product surface |
+| [`docs/progress.md`](./docs/progress.md) | Current maintainer implementation state |
 
 ## License
 

@@ -96,7 +96,7 @@ Implemented after restart/reload testing:
 - OMP recall compaction suppresses raw semantic/content chunk arrays when fused candidates exist, reducing noisy context injection while preserving fallback behavior.
 - OMP reverse-canon compaction now keeps canon matches only when the query directly names the term/alias or the canon file touches a surfaced candidate path.
 - OMP adapter tests now cover adapter label/hooks, tool registration/schema surface, and recall compactor behavior.
-- Core, OpenCode adapter, and OMP adapter package metadata remain `0.1.0`; `1.0.0` is deferred until broader runtime verification proves the v1 contract.
+- Core, OpenCode adapter, and OMP adapter package metadata now report `0.8.0`, reflecting the operational late-beta House; `0.9.0` follows the verified Rust cutover and `1.0.0` follows supported ordinary-user installation and stable public contracts.
 - Core now has a pure `query-routing.ts` leaf for query parsing/classification, including raw code/path tokens, original-case entity hints, casual/date/technical intent, and lane decisions.
 - Core memory injection gates semantic/content source loading through query routing and keeps date lookup on its existing no-date preflight.
 - Core recall honors JSON-only source mode for deterministic tests and passes query-route skip flags to the Postgres helper so full-mode recall can omit semantic/content/date branches without extra WSL spawns.
