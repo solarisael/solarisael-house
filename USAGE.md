@@ -194,5 +194,5 @@ That is enough. House becomes deeper as the room accumulates deliberate continui
 - Retrieval and corrections: [`docs/RETRIEVAL.md`](./docs/RETRIEVAL.md)
 - Typed lessons and imports: [`docs/LESSONS.md`](./docs/LESSONS.md)
 - Identity and room design: [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md)
-- Privacy and destructive operations: [`SECURITY.md`](./SECURITY.md)
-- Platform and product boundaries: [`LIMITATIONS.md`](./LIMITATIONS.md)
+- Privacy and destructive operations: [`SECURITY.md`](./docs/SECURITY.md)
+- Platform and product boundaries: [`LIMITATIONS.md`](./docs/LIMITATIONS.md)

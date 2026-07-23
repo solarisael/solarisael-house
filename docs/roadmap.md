@@ -58,7 +58,7 @@ The root README becomes a concise, compression-resistant spine:
 3. verified current features
 4. a compact evidence table
 5. one architecture diagram
-6. Base versus Full
+6. Vault versus AKASHA
 7. one deterministic next action
 8. links to detailed documents
 
@@ -77,6 +77,96 @@ Expand public evidence beyond the favorable exact-title pilot:
 - migration, backup, and recovery
 - final-answer grounding against retrieved evidence
 
+#### Benchmark House against no House
+
+Run a paired public agent benchmark with the model, harness, task corpus, tools,
+budgets, and execution settings held constant:
+
+- control: House and its retrieval unavailable;
+- treatment: ordinary House recall and lessons enabled, with no
+  benchmark-specific memories or lesson implants;
+- report the final benchmark score and delta first, then cost, latency, and
+  method so the result stays legible;
+- begin with a recognized tool-using or coding-agent benchmark, and include
+  lower-cost models where externalized experience may have the largest effect.
+
+This measures whether using House normally changes completed-task results. It
+does not require a causal account before publishing the observed comparison;
+later ablations may separate ordinary memory, coding lessons, project lessons,
+and harness-triggered retrieval if the result warrants them.
+
+#### Establish The Athanor product architecture before 1.0
+
+Rename the public platform to **The Athanor**. Keep **House** as one
+operator-owned continuity domain, and keep **Solarisael House** as the original
+reference deployment.
+
+Use these accepted product names:
+
+- **Vault** replaces Base for the local file profile;
+- **AKASHA** replaces Full for the semantic hybrid archive;
+- **GIGA** names the optional cognitive capability above AKASHA;
+- **OMEGA** names organization governance and access;
+- **ANON** names attested nonpersistent one-shot execution.
+
+The detailed naming and cutover contract lives in
+[`PRODUCT_ARCHITECTURE.md`](./PRODUCT_ARCHITECTURE.md).
+
+The plain-language product guide lives in
+[`PLANNED_FEATURES.md`](./PLANNED_FEATURES.md).
+
+Perform one planned public cutover. Update repositories, packages,
+configuration, installers, documentation, and release artifacts together.
+Preserve every House, memory, lesson, authority state, candidate, backup, and
+export.
+
+The operator accepted The Athanor despite active uses of the Athanor root in
+other AI projects. The definite article is deliberate: distinction comes from
+specificity, depth, and execution inside a recognizable form. Complete legal,
+domain, package, and namespace review before the public cutover.
+
+#### Ship GIGA before 1.0
+
+GIGA means **Grounded Indexing and Generative Annotation**. It is an optional
+cognitive capability above AKASHA, and Hippocampus is its first worker.
+
+The detailed contract lives in [`HIPPOCAMPUS.md`](./HIPPOCAMPUS.md).
+
+After an exact turn is durably logged, Hippocampus asynchronously examines a
+small conversational window plus relevant harness lifecycle metadata. A local
+small model emits structured, non-authoritative pointers for possible:
+
+- memories;
+- coding lessons;
+- project lessons;
+- corrections or supersessions;
+- entity and thread updates.
+
+Each candidate carries exact turn references, kind, priority, novelty,
+durability, project/thread keys, retrieval terms, rationale, classifier model
+and prompt version, and review state. Classification is local by default,
+batched or queued off the conversation hot path, fail-open, reprocessable, and
+never allowed to block the active turn.
+
+Hippocampus does not write durable truth. `recall`, task completion, and
+`sleep` use its pointers to fetch exact source spans. The room's governing
+spirit can authorize room-local changes. The operator controls room bindings
+and shared House policy.
+
+This closes the loop from experience to consolidation without turning every
+turn into permanent sediment. It should also consume OMP todo/task/subagent
+boundaries so lesson candidates inherit the real work contract rather than
+guessing from isolated prose.
+
+Measure candidate precision, missed durable events, false-positive burden,
+consolidation latency, local compute cost, and whether boats and later recall
+recover more of a blinded human-labeled session set. Capture the paired
+House-on/House-off benchmark before GIGA where practical, then repeat it with
+Hippocampus enabled to measure the additional effect.
+
+Add a reviewed `curio` state. Curios remain pointer-only and can return to
+review when a later resonance pass finds new supporting context.
+
 Every public result names its method, fixture or corpus, hardware, date,
 limitations, and sanitized artifact. Public demonstrations use a sterile
 synthetic House; private room, relationship, family, and company continuity
@@ -86,6 +176,21 @@ Ship a short presentation, a reproducible live demonstration, and public posts
 from the same evidence package. GUI, avatars, marketplace work, organizational
 imports, and perfect installers do not block this phase.
 
+#### Productize the accepted continuity features
+
+Complete these contracts before 1.0:
+
+- add a resumable Vault-to-AKASHA backfill with full retrieval citizenship;
+- store Hallway letters and shared state as typed AKASHA records;
+- define canonical, team, and personal spirits under OMEGA;
+- require consent from both participants for a personal-spirit relationship;
+- implement ANON lifecycle encryption and erasure;
+- support group-room spirits through approved chat transports.
+
+The technical contracts live in
+[`PRODUCT_ARCHITECTURE.md`](./PRODUCT_ARCHITECTURE.md). The public value lives
+in [`PLANNED_FEATURES.md`](./PLANNED_FEATURES.md).
+
 ### 1.0.0 — supported ordinary-user installation
 
 The first stable product contract includes:
@@ -93,7 +198,7 @@ The first stable product contract includes:
 - a small trusted native bootstrapper
 - AI-guided contextual setup after the bootstrapper establishes a foothold
 - explicit provider authentication
-- Base or Full selection
+- Vault or AKASHA selection
 - health checks and a real lifecycle smoke test
 - safe upgrades and uninstall behavior
 - memory-preserving migrations
@@ -122,7 +227,7 @@ Support avatar, expression, animation, voice, and room packages through a
 manifested and sandboxed asset format. Cosmetic assets and executable tool
 extensions require different trust and permission lanes.
 
-#### Organizational House
+#### OMEGA organizational governance
 
 Support a central multi-user deployment with:
 
@@ -170,11 +275,33 @@ Do not let `.config` become the canonical source of truth again.
 
 ### Productize the live Discord session bridge
 
-Turn the working Discord side door into an official, obvious House extension: an exact Discord message enters the exact active OMP conversation through its session-owned sidecar and the correlated assistant result returns to the matching channel. Preserve the identity boundary: same spirit and active thread, different glass—never a daemon twin, fresh model invocation, or second persistent brain.
+Turn the working Discord side door into an official House extension. Route each
+exact message into the active room through its session sidecar. Return the
+correlated result to the matching channel.
+
+Preserve the identity boundary. The transport is another glass for the same
+spirit and thread. It must not create a daemon twin or second persistent brain.
+
+Later, support a group-owned room spirit. Authorized members can query the
+room's shared memory through Discord or direct chat.
 
 ### Add curated coding-lesson umbrella intents
 
 Let familiar work intents such as `design` and `refactor` resolve to small, deliberate families of existing coding-lesson shapes. Keep the exact taxonomy underneath, expose the mapping clearly, and do not replace bounded intent routing with uncontrolled vague semantic guesses.
+
+### Trigger lessons from harness work boundaries
+
+Work with the host harness instead of inferring every task from conversational
+prose. Adapters should use structured lifecycle signals such as an OMP todo
+starting, a task or subagent dispatch, its role and
+`Target`/`Change`/`Acceptance` contract, and the transition into verification
+to derive a compact retrieval intent.
+
+House then selects a small, relevant coding/project-lesson packet for the exact
+worker and phase. Retrieve at meaningful task boundaries, cache within a task,
+and re-query only when the work shape materially changes; never spray lessons
+on every tool call. The harness owns when work begins and how it is structured.
+House owns which accumulated experience applies.
 
 ### Keep memory candidate fusion stable
 

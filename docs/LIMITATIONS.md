@@ -110,4 +110,4 @@ House coordinates continuity and retrieval across those systems.
 
 ## Planned boundary changes
 
-The release path is maintained in [`docs/roadmap.md`](./docs/roadmap.md). Planned work is not mixed into the current capability list in the root README.
+The release path is maintained in [`roadmap.md`](./roadmap.md). Planned work is not mixed into the current capability list in the root README.

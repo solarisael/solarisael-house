@@ -8,7 +8,7 @@ Give this repository to a tool-capable AI agent with:
 
 The agent performs the protocol. The operator chooses identity, location, deployment mode, and consequential system changes.
 
-Read [`SECURITY.md`](./SECURITY.md) before handling credentials or private room data. Read [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) before writing an identity.
+Read [`SECURITY.md`](./docs/SECURITY.md) before handling credentials or private room data. Read [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) before writing an identity.
 
 ## Result
 
@@ -267,7 +267,7 @@ Host changes: <none or exact list>
 
 ## Adapted installations
 
-The tested support matrix lives in [`LIMITATIONS.md`](./LIMITATIONS.md).
+The tested support matrix lives in [`LIMITATIONS.md`](./docs/LIMITATIONS.md).
 
 A tool-capable agent may adapt paths and host commands while preserving these contracts:
 

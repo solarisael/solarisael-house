@@ -139,4 +139,4 @@ A miss can mean query mismatch, indexing lag, scope, authority suppression, sour
 
 ## Public evaluation
 
-Retrieval metrics and their scope live in [`../EVIDENCE.md`](../EVIDENCE.md). Never publish raw private retrieval payloads.
+Retrieval metrics and their scope live in [`EVIDENCE.md`](./EVIDENCE.md). Never publish raw private retrieval payloads.

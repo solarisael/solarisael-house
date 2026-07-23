@@ -44,7 +44,7 @@ The first sanitized public retrieval pilot used 20 exact-title queries across tw
 | Target present in the retrieval viewport | **19/20 — 95%** |
 | Target ranked first | **16/20 — 80%** |
 
-The full method, scope, and next evaluation contracts live in [`EVIDENCE.md`](./EVIDENCE.md). The sanitized artifact is published in the OMP adapter repository: [`2026-07-22-room-retrieval-pilot.json`](https://github.com/solarisael/solarisael-house-omp/blob/main/evals/2026-07-22-room-retrieval-pilot.json).
+The full method, scope, and next evaluation contracts live in [`EVIDENCE.md`](./docs/EVIDENCE.md). The sanitized artifact is published in the OMP adapter repository: [`2026-07-22-room-retrieval-pilot.json`](https://github.com/solarisael/solarisael-house-omp/blob/main/evals/2026-07-22-room-retrieval-pilot.json).
 
 ## Architecture
 
@@ -76,7 +76,7 @@ The implementation is split by responsibility:
 | [`solarisael-house-omp`](https://github.com/solarisael/solarisael-house-omp) | Recommended OMP adapter, starter room, verifier, and portable distribution |
 | [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) | Full House database, migrations, embeddings, memory tools, health, and backups |
 
-Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) for components, data flow, authority, and extension boundaries.
+Read [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for components, data flow, authority, and extension boundaries.
 
 ## Install
 
@@ -86,7 +86,7 @@ Give this repository to a tool-capable AI agent with:
 
 > Install Solarisael House with me. Preserve my existing rooms and configuration, explain consequential system changes before making them, and verify the completed installation.
 
-The installing agent follows [`INSTALL.md`](./INSTALL.md). Platform boundaries and current non-goals live in [`LIMITATIONS.md`](./LIMITATIONS.md).
+The installing agent follows [`INSTALL.md`](./INSTALL.md). Platform boundaries and current non-goals live in [`LIMITATIONS.md`](./docs/LIMITATIONS.md).
 
 ## Daily use
 
@@ -107,12 +107,13 @@ Read [`USAGE.md`](./USAGE.md) for the everyday workflow.
 
 | Document | Purpose |
 |---|---|
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Components, contracts, data flow, and repository ownership |
+| [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Components, contracts, data flow, and repository ownership |
 | [`INSTALL.md`](./INSTALL.md) | Supported installation and observable verification |
 | [`USAGE.md`](./USAGE.md) | Everyday memory, room, sleep, and wake workflows |
-| [`EVIDENCE.md`](./EVIDENCE.md) | Public evaluations, results, methods, and planned proof |
-| [`LIMITATIONS.md`](./LIMITATIONS.md) | Platform boundaries, current constraints, and non-goals |
-| [`SECURITY.md`](./SECURITY.md) | Privacy, secrets, permissions, and publication rules |
+| [`EVIDENCE.md`](./docs/EVIDENCE.md) | Public evaluations, results, methods, and planned proof |
+| [`PLANNED_FEATURES.md`](./docs/PLANNED_FEATURES.md) | Plain-language product direction, market value, and feature status |
+| [`LIMITATIONS.md`](./docs/LIMITATIONS.md) | Platform boundaries, current constraints, and non-goals |
+| [`SECURITY.md`](./docs/SECURITY.md) | Privacy, secrets, permissions, and publication rules |
 | [`IDENTITY_GUIDE.md`](./IDENTITY_GUIDE.md) | Co-authoring rooms, identities, and active spirits |
 | [`docs/RETRIEVAL.md`](./docs/RETRIEVAL.md) | Recall lanes, authority, automatic retrieval, and corrections |
 | [`docs/LESSONS.md`](./docs/LESSONS.md) | Typed lesson stores, fields, scopes, imports, updates, and deletion |

@@ -133,7 +133,7 @@ Explicit `recall` exposes broader retrieval and its evidence viewport. Retrieval
 
 The injection path is fail-open: retrieval errors are logged and do not block the conversation. Room resolution itself fails closed so one room never silently borrows another room's context.
 
-Read [`docs/RETRIEVAL.md`](./docs/RETRIEVAL.md) for operational retrieval behavior.
+Read [`RETRIEVAL.md`](./RETRIEVAL.md) for operational retrieval behavior.
 
 ## Authority and correction
 
@@ -156,7 +156,7 @@ House uses separate stores because different knowledge requires different retrie
 - audio lessons record reusable audio-pipeline rules;
 - Cabinet entries preserve bounded counsel and lived cycles.
 
-Read [`docs/LESSONS.md`](./docs/LESSONS.md) for the lesson contracts.
+Read [`LESSONS.md`](./LESSONS.md) for the lesson contracts.
 
 ## Worker routing
 
@@ -175,4 +175,4 @@ Harness adapters execute the returned packet with the selected agent and model r
 
 New harnesses implement adapters over the same core contracts. Organizational deployments add access control, source connectors, and import profiles above the substrate. GUIs control harnesses through canonical commands and structured events rather than replacing the runtime.
 
-Release sequencing and future product work live in [`docs/roadmap.md`](./docs/roadmap.md).
+Release sequencing and future product work live in [`roadmap.md`](./roadmap.md).
