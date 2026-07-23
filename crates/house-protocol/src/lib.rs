@@ -1,6 +1,6 @@
 //! Newline-delimited JSON wire protocol, version 1.
 
-use house_core::{AnamnesisActivation, AnamnesisAddRequest, AnamnesisAppendReceipt, AnamnesisAppendRequest, AnamnesisFidelity, AnamnesisKind, AnamnesisReadMode, AnamnesisReadRequest, AnamnesisReceipt, AnamnesisSeedRep, RecallRequest, RememberKind, RememberReceipt, RememberRequest, RoomKey};
+use house_core::{AnamnesisActivation, AnamnesisAddRequest, AnamnesisAppendReceipt, AnamnesisAppendRequest, AnamnesisFidelity, AnamnesisKind, AnamnesisReadMode, AnamnesisReadRequest, AnamnesisReceipt, AnamnesisSeedRep, ClusterMaintenanceOperation, ClusterMaintenanceRequest, ClusterMaintenanceResult, ClusterStaleness, RecallRequest, RememberKind, RememberReceipt, RememberRequest, RoomKey};
 use serde::{de::{DeserializeOwned, Error as DeError}, Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
@@ -69,6 +69,48 @@ pub struct RecallParams {
     pub content_min_similarity: f64,
 }
 
+fn deserialize_unit_fraction<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where D: Deserializer<'de> {
+    let value = f64::deserialize(deserializer)?;
+    if value.is_finite() && (0.0..=1.0).contains(&value) { Ok(value) } else { Err(D::Error::custom("must be finite and between 0 and 1")) }
+}
+fn default_cluster_k() -> u32 { 8 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ClusterMaintenanceParams {
+    pub room: String,
+    pub operation: String,
+    #[serde(default)] pub dry_run: bool,
+    #[serde(default)] pub if_stale: bool,
+    #[serde(default = "default_cluster_k")] pub k: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ClusterStalenessTelemetry {
+    pub built_at: Option<String>,
+    pub chunks_since_build: u64,
+    #[serde(deserialize_with = "deserialize_unit_fraction")]
+    pub fraction_unseen: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ClusterResonanceTelemetry {
+    pub profile: Vec<ClusterProfileEntry>,
+    pub hot: Vec<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ClusterProfileEntry {
+    pub label: String,
+    #[serde(deserialize_with = "deserialize_unit_fraction")]
+    pub activation: f64,
+    pub member_count: u64,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RecallResult {
@@ -93,8 +135,50 @@ pub struct RecallResult {
     pub cluster: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clusters: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "clusterStaleness")]
+    pub cluster_staleness: Option<ClusterStalenessTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "clusterResonance")]
+    pub cluster_resonance: Option<ClusterResonanceTelemetry>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "memoryHandle")]
     pub memory_handle: Option<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterMaintenanceStalenessResult {
+    pub built_at: Option<String>,
+    pub clusters: u64,
+    pub chunks_total: u64,
+    pub chunks_since_build: u64,
+    pub fraction_unseen: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterSummaryResult {
+    pub cluster_id: i64,
+    pub label: String,
+    pub member_count: u64,
+    pub accepted: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterMaintenanceStatusResult {
+    pub stale: bool,
+    pub reason: String,
+    pub staleness: ClusterMaintenanceStalenessResult,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterMaintenanceResultWire {
+    pub ok: bool,
+    pub operation: String,
+    pub dry_run: bool,
+    pub rebuilt: bool,
+    pub status: ClusterMaintenanceStatusResult,
+    pub clusters: Vec<ClusterSummaryResult>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -195,6 +279,7 @@ impl<'de> Deserialize<'de> for RememberResult {
                 lesson_id: None,
                 kind: None,
                 durable,
+
                 authority,
                 warnings,
             }),
@@ -229,6 +314,14 @@ impl TryFrom<RecallParams> for RecallRequest {
             params.content_top_k,
             params.content_min_similarity,
         ).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
+    }
+}
+impl TryFrom<ClusterMaintenanceParams> for ClusterMaintenanceRequest {
+    type Error = ProtocolError;
+    fn try_from(p: ClusterMaintenanceParams) -> Result<Self, Self::Error> {
+        let room = RoomKey::new(p.room).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        let operation = ClusterMaintenanceOperation::parse(&p.operation).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
+        Self::new(room, operation, p.dry_run, p.if_stale, p.k).map_err(|e| ProtocolError::InvalidParams(e.to_string()))
     }
 }
 
@@ -378,6 +471,13 @@ impl RequestEnvelope {
         if self.method != "recall" { return Err(ProtocolError::UnknownMethod(self.method)); }
         let params: RecallParams = serde_json::from_value(self.params).map_err(|e| ProtocolError::InvalidParams(e.to_string()))?;
         params.try_into()
+    }
+    pub fn cluster_maintenance_request(self) -> Result<ClusterMaintenanceRequest, ProtocolError> {
+        if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
+        if self.method != "cluster_maintenance" { return Err(ProtocolError::UnknownMethod(self.method)); }
+        serde_json::from_value::<ClusterMaintenanceParams>(self.params)
+            .map_err(|e| ProtocolError::InvalidParams(e.to_string()))?
+            .try_into()
     }
     pub fn anamnesis_request(self) -> Result<AnamnesisReadRequest, ProtocolError> {
         if self.protocol != PROTOCOL_VERSION { return Err(ProtocolError::ProtocolMismatch(self.protocol)); }
@@ -617,5 +717,27 @@ mod tests {
         assert!(base(serde_json::json!({"room":"lab","kind":"coding-lesson","title":"T","body":"B","threads":["x"]})).remember_request().is_err());
         assert!(base(serde_json::json!({"room":"lab","kind":"writing-lesson","title":"T","body":"B","project":"x"})).remember_request().is_err());
         assert!(base(serde_json::json!({"room":"lab","kind":"memory","title":"T","body":"B","shape":"x"})).remember_request().is_err());
+    }
+    #[test]
+    fn cluster_maintenance_is_strict_and_camel_case() {
+        let request = RequestEnvelope::parse_line(r#"{"protocol":1,"id":"c","method":"cluster_maintenance","params":{"room":"lab","operation":"rebuild","dryRun":true,"ifStale":true,"k":40}}"#).unwrap();
+        let parsed = request.cluster_maintenance_request().unwrap();
+        assert_eq!(parsed.operation(), ClusterMaintenanceOperation::Rebuild);
+        assert!(parsed.dry_run());
+        assert!(parsed.if_stale());
+        assert_eq!(serde_json::to_string(&ClusterMaintenanceParams { room: "lab".into(), operation: "rebuild".into(), dry_run: true, if_stale: true, k: 40 }).unwrap(), r#"{"room":"lab","operation":"rebuild","dryRun":true,"ifStale":true,"k":40}"#);
+        for bad in [serde_json::json!({"room":"lab","operation":"rebuild","k":0}), serde_json::json!({"room":"lab","operation":"rebuild","k":129}), serde_json::json!({"room":"lab","operation":"other","k":4}), serde_json::json!({"room":"lab","operation":"rebuild","extra":true})] {
+            assert!(RequestEnvelope { protocol: 1, id: "c".into(), method: "cluster_maintenance".into(), params: bad }.cluster_maintenance_request().is_err());
+        }
+        assert!(RequestEnvelope { protocol: 1, id: "c".into(), method: "recall".into(), params: serde_json::json!({}) }.cluster_maintenance_request().is_err());
+    }
+
+    #[test]
+    fn recall_cluster_telemetry_is_optional_and_compatible() {
+        let telemetry: ClusterStalenessTelemetry = serde_json::from_value(serde_json::json!({"built_at":null,"chunks_since_build":250,"fraction_unseen":0.05})).unwrap();
+        assert_eq!(telemetry.built_at, None);
+        let resonance: ClusterResonanceTelemetry = serde_json::from_value(serde_json::json!({"profile":[{"label":"x","activation":0.9,"member_count":2}],"hot":["chunk"]})).unwrap();
+        assert_eq!(resonance.profile[0].member_count, 2);
+        assert!(serde_json::from_value::<ClusterStalenessTelemetry>(serde_json::json!({"built_at":null,"chunks_since_build":1,"fraction_unseen":0.1,"bad":true})).is_err());
     }
 }

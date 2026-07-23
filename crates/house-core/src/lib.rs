@@ -39,6 +39,7 @@ pub enum DomainError {
     InvalidTopK { field: String, value: u32 },
     InvalidThreshold { field: String, value: f64 },
     InvalidAnamnesis { field: String, message: String },
+    InvalidClusterMaintenance { field: String, message: String },
     InvalidAnamnesisLimit { value: u32 },
     MissingAnamnesisQuery,
     MissingAnamnesisSeed,
@@ -65,6 +66,7 @@ impl fmt::Display for DomainError {
             Self::InvalidTopK { field, value } => write!(f, "{field} must be positive and at most 1000: {value}"),
             Self::InvalidThreshold { field, value } => write!(f, "{field} must be finite and in [0, 1]: {value}"),
             Self::InvalidAnamnesis { field, message } => write!(f, "invalid anamnesis {field}: {message}"),
+            Self::InvalidClusterMaintenance { field, message } => write!(f, "invalid cluster maintenance {field}: {message}"),
             Self::InvalidAnamnesisLimit { value } => write!(f, "anamnesis limit must be between 1 and 50: {value}"),
             Self::MissingAnamnesisQuery => f.write_str("consult mode requires a non-empty query"),
             Self::MissingAnamnesisSeed => f.write_str("cycle requires a seed repetition unless allow_empty_cycle is true"),
@@ -278,6 +280,105 @@ impl RecallRequest {
     pub const fn content_min_similarity(&self) -> f64 { self.content_min_similarity }
 }
 
+const MAX_CLUSTER_K: u32 = 128;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ClusterMaintenanceOperation { Check, Rebuild }
+
+impl ClusterMaintenanceOperation {
+    pub fn parse(value: &str) -> Result<Self, DomainError> {
+        match value {
+            "check" => Ok(Self::Check),
+            "rebuild" => Ok(Self::Rebuild),
+            other => Err(DomainError::InvalidClusterMaintenance { field: "operation".into(), message: format!("unsupported value: {other}") }),
+        }
+    }
+    pub const fn as_str(self) -> &'static str { match self { Self::Check => "check", Self::Rebuild => "rebuild" } }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClusterMaintenanceRequest {
+    room: RoomKey,
+    operation: ClusterMaintenanceOperation,
+    dry_run: bool,
+    if_stale: bool,
+    k: u32,
+}
+
+impl ClusterMaintenanceRequest {
+    pub fn new(room: RoomKey, operation: ClusterMaintenanceOperation, dry_run: bool, if_stale: bool, k: u32) -> Result<Self, DomainError> {
+        if k == 0 || k > MAX_CLUSTER_K {
+            return Err(DomainError::InvalidClusterMaintenance { field: "k".into(), message: format!("must be between 1 and {MAX_CLUSTER_K}") });
+        }
+        if operation == ClusterMaintenanceOperation::Check && dry_run {
+            return Err(DomainError::InvalidClusterMaintenance { field: "dryRun".into(), message: "check does not accept dryRun".into() });
+        }
+        Ok(Self { room, operation, dry_run, if_stale, k })
+    }
+    pub fn room(&self) -> &RoomKey { &self.room }
+    pub const fn operation(&self) -> ClusterMaintenanceOperation { self.operation }
+    pub const fn dry_run(&self) -> bool { self.dry_run }
+    pub const fn if_stale(&self) -> bool { self.if_stale }
+    pub const fn k(&self) -> u32 { self.k }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterStaleness {
+    built_at: Option<String>,
+    chunks_since_build: u64,
+    fraction_unseen: f64,
+}
+
+impl ClusterStaleness {
+    pub fn new(built_at: Option<String>, chunks_since_build: u64, fraction_unseen: f64) -> Result<Self, DomainError> {
+        if !fraction_unseen.is_finite() || !(0.0..=1.0).contains(&fraction_unseen) {
+            return Err(DomainError::InvalidClusterMaintenance { field: "fractionUnseen".into(), message: "must be finite and between 0 and 1".into() });
+        }
+        Ok(Self { built_at, chunks_since_build, fraction_unseen })
+    }
+    pub fn built_at(&self) -> Option<&str> { self.built_at.as_deref() }
+    pub const fn chunks_since_build(&self) -> u64 { self.chunks_since_build }
+    pub const fn fraction_unseen(&self) -> f64 { self.fraction_unseen }
+    pub const fn is_stale(&self, age_days: u64) -> bool {
+        self.built_at.is_none() || (self.chunks_since_build > 0 && (self.fraction_unseen >= 0.05 || self.chunks_since_build >= 250 || age_days >= 7))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterSummary {
+    label: String,
+    member_count: u64,
+    accepted: bool,
+}
+
+impl ClusterSummary {
+    pub fn new(label: impl Into<String>, member_count: u64, accepted: bool) -> Result<Self, DomainError> {
+        let label = label.into();
+        if label.trim().is_empty() { return Err(DomainError::InvalidClusterMaintenance { field: "label".into(), message: "must not be empty".into() }); }
+        Ok(Self { label, member_count, accepted })
+    }
+    pub fn label(&self) -> &str { &self.label }
+    pub const fn member_count(&self) -> u64 { self.member_count }
+    pub const fn accepted(&self) -> bool { self.accepted }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterMaintenanceStatus {
+    pub stale: bool,
+    pub reason: String,
+    pub staleness: ClusterStaleness,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterMaintenanceResult {
+    pub ok: bool,
+    pub operation: ClusterMaintenanceOperation,
+    pub dry_run: bool,
+    pub rebuilt: bool,
+    pub status: ClusterMaintenanceStatus,
+    pub clusters: Vec<ClusterSummary>,
+}
+
 impl fmt::Display for RoomKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) }
 }
@@ -489,5 +590,21 @@ mod tests {
         let result = authorize(HouseMode::Full, HealthVerdict::Unhealthy { reason: "db down".into() });
         assert_eq!(result, Err(DomainError::FullUnhealthy { reason: "db down".into() }));
         assert_eq!(authorize(HouseMode::Degraded, HealthVerdict::Healthy), Err(DomainError::DegradedUnavailable));
+    }
+    #[test]
+    fn cluster_staleness_boundaries_require_unseen_chunks() {
+        let fresh = ClusterStaleness::new(Some("2026-07-20T00:00:00Z".into()), 0, 0.05).unwrap();
+        assert!(!fresh.is_stale(30));
+        assert!(ClusterStaleness::new(Some("2026-07-20T00:00:00Z".into()), 1, 0.05).unwrap().is_stale(0));
+        assert!(ClusterStaleness::new(Some("2026-07-20T00:00:00Z".into()), 250, 0.0).unwrap().is_stale(0));
+        assert!(ClusterStaleness::new(Some("2026-07-20T00:00:00Z".into()), 1, 0.0).unwrap().is_stale(7));
+        assert!(ClusterStaleness::new(None, 0, 0.0).unwrap().is_stale(0));
+    }
+
+    #[test]
+    fn cluster_request_rejects_invalid_k_and_check_options() {
+        let room = RoomKey::new("lab").unwrap();
+        assert!(ClusterMaintenanceRequest::new(room.clone(), ClusterMaintenanceOperation::Rebuild, false, false, 0).is_err());
+        assert!(ClusterMaintenanceRequest::new(room, ClusterMaintenanceOperation::Check, true, false, 8).is_err());
     }
 }
