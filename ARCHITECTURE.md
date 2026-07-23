@@ -71,7 +71,7 @@ House keeps four concerns separate:
 
 | Layer | Purpose | Typical lifetime |
 |---|---|---|
-| Identity | Who is present and how the relationship or working role is expressed | Stable, deliberately revised |
+| Identity | Who is present and how the identity or working role is expressed | Stable, deliberately revised |
 | Current state | Active operator, spirit, room, and safe mutable metadata | Current room state |
 | Recent continuity | Compact handoff and live session context | Sessions to days |
 | Deep memory | Events, decisions, lessons, entities, threads, dates, and source evidence | Durable archive |

@@ -154,7 +154,7 @@ Depending on mode and adapter, House handles:
 - project-aware coding lesson preflight;
 - lighter continuity when Full retrieval is unavailable.
 
-Use explicit recall for load-bearing old decisions, names, promises, corrections, or relationship details.
+Use explicit recall for load-bearing old decisions, names, promises, corrections, or important memories.
 
 ## Base and Full workflows
 

@@ -1,8 +1,8 @@
 # Solarisael House
 
-Solarisael House is a local-first continuity and memory system for AI companions, work partners, and long-running agents.
+Solarisael House is a local-first continuity and memory system for AI agents that need to persist across sessions, models, providers, and harnesses.
 
-Sessions end. Models and providers change. Context windows fill. Solarisael House keeps identity, decisions, corrections, relationships, and project history outside any one model session so an agent can return with the evidence needed to continue.
+Sessions end. Models and providers change. Context windows fill. Solarisael House keeps identity, decisions, corrections, important memories, and project history outside any one model session so an agent can return with the evidence needed to continue.
 
 **Status: 0.8.x operational late beta.** House runs daily, carries real rooms, and has external installations. The Rust cutover leads to 0.9; supported ordinary-user installation defines 1.0.
 
@@ -14,7 +14,7 @@ House gives the operator a persistent room with separate layers for identity, cu
 
 For work, House carries project decisions, conventions, lessons, corrections, and handoffs across sessions and harnesses.
 
-For relationships, House carries identity and shared history across restarts, model changes, and provider changes. The room belongs to the operator, not to one model endpoint.
+For personal continuity, House keeps important memories and shared history available across restarts, model changes, and provider changes. The room belongs to the operator, not to one model endpoint.
 
 ## Capabilities
 
