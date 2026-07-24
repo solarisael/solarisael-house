@@ -9,26 +9,28 @@ The guided public installation currently supports:
 - Windows 10 or 11;
 - OMP;
 - Bun;
-- Base House room files and adapter runtime.
+- the stable Rust MSVC toolchain;
+- Base House room files and the TypeScript OMP lifecycle adapter over Rust core contracts.
 
 Full House on the guided Windows path additionally uses:
 
+- the release-built Windows `solarisael-house-substrate.exe`;
 - WSL 2 with Ubuntu;
-- PostgreSQL with pgvector;
-- Python 3;
+- PostgreSQL 16 with pgvector and `pg_trgm`;
+- Python 3.11+ for migrations, health, imports, and maintenance;
 - a compatible local embedding endpoint;
 - approximately 10 GB of free storage for the tested setup.
 
-The tested embedding default is Nemotron-3-Embed-1B through WSL ROCm Ollama on compatible AMD hardware.
+The tested embedding default is Nemotron-3-Embed-1B through WSL ROCm Ollama on compatible AMD hardware. The mounted OMP memory path uses the long-lived Windows Rust process; Python support scripts are not a substitute for that runtime proof.
 
 ## Other hosts
 
 | Host | Current state |
 |---|---|
 | Windows + OMP + Base | Supported guided path |
-| Windows + OMP + WSL Full House | Public setup split between the OMP and substrate repositories |
-| Native Linux | Substrate-compatible; adapter path requires host-specific adaptation and verification |
-| OpenCode | Adapter exists with automated coverage; the OMP installer does not configure or verify it |
+| Windows + OMP + WSL Full House | Supported guided Rust-first path split between the core, OMP, and substrate repositories |
+| Native Linux | Database and support tools are adaptable; the current Windows executable and OMP integration require host-specific engineering and verification |
+| OpenCode | Adapter work predates the Rust cutover; it is not covered by the current guided installer |
 | macOS | Unsupported by the guided installation |
 | Other harnesses | Require an adapter over the core contracts |
 
@@ -36,7 +38,7 @@ An adapted path becomes trustworthy when it proves the same observable contracts
 
 ## Installation boundary
 
-Version 0.8 uses an AI-guided developer-shaped setup. The operator still needs a working harness and its authentication before the AI can take over. The 1.0 milestone adds a trusted native bootstrapper, ordinary-user onboarding, upgrades, uninstall behavior, backup, and recovery.
+Version 0.9 uses an AI-guided developer-shaped setup with a verified Rust-first runtime. The operator still needs a working harness and its authentication before the AI can take over. The 1.0 milestone adds a trusted native bootstrapper, ordinary-user onboarding, upgrades, uninstall behavior, backup, and recovery.
 
 The current installer does not promise one-click setup on an otherwise empty machine.
 

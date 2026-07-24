@@ -14,7 +14,8 @@ Read [`SECURITY.md`](./docs/SECURITY.md) before handling credentials or private 
 
 A completed Base installation has:
 
-- the core and OMP adapter in resolvable sibling directories;
+- the Rust core and OMP adapter in resolvable sibling directories;
+- the adapter's Bun dependencies installed;
 - one writable room with a stable key and co-authored identity;
 - both OMP extensions connected without replacing existing configuration;
 - a passing static verifier;
@@ -23,8 +24,10 @@ A completed Base installation has:
 
 A completed Full installation additionally has:
 
-- a healthy public substrate;
-- a real memory write and recall in the new room;
+- the public substrate repository beside the core and adapter;
+- a release-built `solarisael-house-substrate.exe` selected through `SOLARISAEL_HOUSE_RUST`;
+- a healthy PostgreSQL, pgvector, and embedding substrate;
+- a real memory write and recall through the mounted Rust-backed OMP tools;
 - a paper boat recovered after a fresh session;
 - substrate backup and recovery configured through its canonical repository.
 
@@ -36,15 +39,20 @@ Base House provides persistent room identity, room state, file-backed continuity
 
 - Windows 10 or 11;
 - OMP;
-- Bun.
+- Bun;
+- the stable Rust MSVC toolchain for the shared core workspace.
 
 Base House requires no database or GPU.
 
 ### Full House
 
-Full House adds durable PostgreSQL memory, pgvector, local embeddings, hybrid retrieval, typed lessons, supersession, and memory lifecycle tools.
+Full House adds durable PostgreSQL memory, pgvector, local embeddings, hybrid retrieval, typed lessons, supersession, and memory lifecycle tools. The authoritative request path is:
 
-The public [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) repository owns Full-mode migrations, dependencies, environment configuration, health, lifecycle smoke, embeddings, and backup/restore.
+```text
+OMP TypeScript adapter -> long-lived Windows Rust substrate process -> PostgreSQL and embedding service in WSL
+```
+
+The public [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) repository owns the Rust process, migrations, dependencies, environment configuration, health, lifecycle smoke, embeddings, and backup/restore. Python remains for migration, health, import, and maintenance support; it is no longer the mounted OMP memory runtime.
 
 Choose Full when the operator wants semantic and hybrid recall, typed stores, database authority, or a larger archive.
 
@@ -93,15 +101,33 @@ Confirm:
 
 Explain the smallest missing prerequisite before installing global software, enabling WSL, or requesting elevation. Record every host-level change in the completion receipt.
 
-### 2. Install package dependencies
+### 2. Install dependencies and build Rust
 
-Run from each package directory:
+From `solarisael-house-omp`:
 
 ```text
 bun install
 ```
 
-Complete dependency installation before connecting the extension.
+From `solarisael-house`:
+
+```text
+cargo test --workspace
+```
+
+For Full House, build the substrate from `solarisael-house-substrate`:
+
+```text
+cargo build --release
+```
+
+The Full runtime executable is:
+
+```text
+solarisael-house-substrate\target\release\solarisael-house-substrate.exe
+```
+
+Complete dependency installation and the required Rust build before connecting the extensions.
 
 ### 3. Choose the first room
 
@@ -145,13 +171,18 @@ extensions:
 
 Append missing entries to an existing list. Do not replace the list.
 
-Optional environment overrides:
+Required Full House environment:
+
+- `SOLARISAEL_HOUSE_RUST` — absolute path to `solarisael-house-substrate.exe`;
+- `SOLARISAEL_PG_WSL=1` — keeps WSL alive while the Windows Rust worker is active;
+- `SOLARISAEL_SUBSTRATE` — absolute substrate repository path used by compatibility checks and support tools.
+
+Optional overrides:
 
 - `SOLARISAEL_VAULT_ROOT` — parent directory containing rooms;
-- `SOLARISAEL_HOUSE_CORE` — alternate core path when core and adapter are not siblings;
-- `SOLARISAEL_SUBSTRATE` — Full substrate directory after its setup passes health.
+- `SOLARISAEL_HOUSE_CORE` — alternate core path when core and adapter are not siblings.
 
-The sibling layout requires no path overrides.
+The sibling layout requires no core-path override. Restart OMP after changing persistent environment variables; an already-running process cannot see them.
 
 ### 5. Run the static verifier
 
@@ -209,26 +240,29 @@ Success means the agent recovers the sentence and identifies `room_summary.md` a
 
 Follow the canonical [`solarisael-house-substrate`](https://github.com/solarisael/solarisael-house-substrate) setup for:
 
-- WSL and PostgreSQL;
-- pgvector;
-- Python dependencies;
-- embedding endpoint;
+- WSL 2 and PostgreSQL 16;
+- pgvector and `pg_trgm`;
+- the Python support environment;
+- embedding service and model;
 - environment configuration;
 - migrations;
 - `health.py`;
+- the release Rust build;
 - lifecycle smoke;
-- backup and restore.
+- Rust backup and restore.
 
-After substrate health reports Full mode, set `SOLARISAEL_SUBSTRATE` to its directory and rerun the OMP static verifier.
+After `health.py` reports Full mode, set `SOLARISAEL_SUBSTRATE`, `SOLARISAEL_HOUSE_RUST`, and `SOLARISAEL_PG_WSL=1`, then rerun the OMP static verifier and start a fresh OMP process.
 
-Then prove the room lifecycle:
+Prove the mounted runtime rather than calling a support script directly:
 
-1. call `remember` with a disposable distinctive installation memory;
-2. call `recall` with that phrase;
+1. call the registered `remember` tool with a disposable distinctive installation memory;
+2. call the registered `recall` tool with that phrase and confirm `source: rust-postgres`;
 3. confirm the returned source belongs to the new room;
-4. call `sleep` with a disposable paper boat;
-5. start a fresh session;
-6. call `wake` and recover the boat.
+4. leave the mounted process idle for at least 75 seconds, then repeat the write and recall;
+5. call `sleep` with a disposable paper boat;
+6. start a fresh session;
+7. call `wake` and recover the boat;
+8. remove only the disposable proof records.
 
 When substrate health reports a degraded dependency, keep Base House active and report `configured-but-degraded` in the receipt. Resolve the substrate condition before claiming Full memory.
 
@@ -244,7 +278,7 @@ Finish with:
 
 ```text
 Solarisael House: connected
-Version: 0.8.x
+Version: 0.9.x
 Bundle: <absolute path>
 OMP config: <absolute path>
 Room: <room key> at <absolute path>

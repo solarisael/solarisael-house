@@ -4,7 +4,7 @@ Solarisael House is a local-first continuity and memory system for AI agents tha
 
 Sessions end. Models and providers change. Context windows fill. Solarisael House keeps identity, decisions, corrections, important memories, and project history outside any one model session so an agent can return with the evidence needed to continue.
 
-**Status: 0.8.x operational late beta.** House runs daily, carries real rooms, and has external installations. The Rust cutover leads to 0.9; supported ordinary-user installation defines 1.0.
+**Status: 0.9.x operational late beta.** The verified Rust-first cutover is complete: Rust now owns the shared contracts and authoritative Full House memory process, while the OMP lifecycle adapter remains TypeScript. Supported ordinary-user installation defines 1.0.
 
 ## What House changes
 
@@ -80,7 +80,7 @@ Read [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for components, data flow, auth
 
 ## Install
 
-The tested path is Windows 10/11 with OMP and Bun. Full House adds the public substrate and its PostgreSQL, pgvector, Python, WSL 2, and embedding requirements.
+The tested path is Windows 10/11 with OMP, Bun, and the stable Rust MSVC toolchain. Base House needs only the core and OMP adapter. Full House adds the public substrate, its release Rust executable, PostgreSQL 16 with pgvector in WSL 2, Python support tools, and a compatible local embedding service.
 
 Give this repository to a tool-capable AI agent with:
 
