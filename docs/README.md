@@ -1,18 +1,28 @@
-# Solarisael House Docs
+# Solarisael House Documentation
 
-This folder is the repo-local continuity spine for `solarisael-house`.
+Start with the root [`README.md`](../README.md) for the product spine, verified capabilities, evidence snapshot, architecture thumbnail, and installation entrypoint.
 
-Keep room/private memory in the Solarisael vault. Keep project state, implementation history, and future technical goals here.
+## Operator documents
 
-## Files
+- [`../INSTALL.md`](../INSTALL.md) — supported installation and observable verification
+- [`../USAGE.md`](../USAGE.md) — everyday memory, room, sleep, and wake workflows
+- [`../IDENTITY_GUIDE.md`](../IDENTITY_GUIDE.md) — co-authoring rooms, identities, and active spirits
+- [`SECURITY.md`](./SECURITY.md) — privacy, secrets, permissions, publication, and destructive operations
+- [`LIMITATIONS.md`](./LIMITATIONS.md) — platform boundaries, current constraints, and non-goals
 
-- `progress.md` — current operational state: what exists, what is verified, what is still open.
-- `roadmap.md` — current and future goals, including memory/retrieval phases.
-- `history/YYYY-MM-DD.md` — daily project history. One file per day.
+## Technical documents
 
-## Rules
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — components, contracts, data flow, authority, and repository ownership
+- [`PRODUCT_ARCHITECTURE.md`](./PRODUCT_ARCHITECTURE.md) — The Athanor product, House domain, profiles, capabilities, governance, privacy, and naming cutover
+- [`RETRIEVAL.md`](./RETRIEVAL.md) — recall lanes, automatic retrieval, authority, corrections, and archival
+- [`LESSONS.md`](./LESSONS.md) — typed lesson stores, fields, scopes, imports, updates, and deletion
+- [`HIPPOCAMPUS.md`](./HIPPOCAMPUS.md) — GIGA event, candidate, authority, review, integration, and evaluation contracts
+- [`EVIDENCE.md`](./EVIDENCE.md) — public evaluations, methods, results, and planned proof
 
-- Record facts that help the next maintainer act.
-- Separate implemented state from planned state.
-- Include verification evidence when a change touches runtime behavior.
-- Do not paste private room memory, hidden context, secrets, or raw credentials.
+## Project documents
+
+- [`../HOUSE.md`](../HOUSE.md) — history, philosophy, and design reasons
+- [`PLANNED_FEATURES.md`](./PLANNED_FEATURES.md) — plain-language product direction, market value, and feature status
+- [`roadmap.md`](./roadmap.md) — release sequence and future product surface
+- [`progress.md`](./progress.md) — current maintainer implementation state
+- [`history/`](./history/) — dated development history
